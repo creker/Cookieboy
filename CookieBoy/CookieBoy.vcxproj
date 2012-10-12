@@ -1,0 +1,182 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{6FC68543-7582-49D1-8D2F-219E7D8BD683}</ProjectGuid>
+    <Keyword>Win32Proj</Keyword>
+    <RootNamespace>CookieBoy</RootNamespace>
+    <ProjectName>CookieBoy</ProjectName>
+    <SccProjectName>SAK</SccProjectName>
+    <SccAuxPath>SAK</SccAuxPath>
+    <SccLocalPath>SAK</SccLocalPath>
+    <SccProvider>SAK</SccProvider>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v110</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v110</PlatformToolset>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <LinkIncremental>true</LinkIncremental>
+    <RunCodeAnalysis>false</RunCodeAnalysis>
+    <CodeAnalysisRuleSet>AllRules.ruleset</CodeAnalysisRuleSet>
+    <CodeAnalysisIgnoreGeneratedCode>false</CodeAnalysisIgnoreGeneratedCode>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <LinkIncremental>false</LinkIncremental>
+    <SourcePath>..\SDL_gfx;$(SourcePath)</SourcePath>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>D:\Program Files\Microsoft DirectX SDK %28June 2010%29\Include;..\SDL\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AssemblerOutput>NoListing</AssemblerOutput>
+      <EnablePREfast>false</EnablePREfast>
+      <PrecompiledHeaderFile>
+      </PrecompiledHeaderFile>
+      <PrecompiledHeaderOutputFile>
+      </PrecompiledHeaderOutputFile>
+      <IntrinsicFunctions>false</IntrinsicFunctions>
+      <FavorSizeOrSpeed>Neither</FavorSizeOrSpeed>
+      <WholeProgramOptimization>false</WholeProgramOptimization>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>SDL.lib;SDLmain.lib;winmm.lib;d3d9.lib;d3dx9.lib;DxErr.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>D:\Program Files\Microsoft DirectX SDK %28June 2010%29\Lib\x86;..\SDL\lib\x86;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <IgnoreAllDefaultLibraries>
+      </IgnoreAllDefaultLibraries>
+      <IgnoreSpecificDefaultLibraries>
+      </IgnoreSpecificDefaultLibraries>
+      <Profile>false</Profile>
+      <TargetMachine>MachineX86</TargetMachine>
+    </Link>
+    <Xdcmake>
+      <AdditionalOptions>/doc %(AdditionalOptions)</AdditionalOptions>
+    </Xdcmake>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <Optimization>Full</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>..\SDL\include;D:\Program Files\Microsoft DirectX SDK %28June 2010%29\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PrecompiledHeaderFile>
+      </PrecompiledHeaderFile>
+      <PrecompiledHeaderOutputFile>
+      </PrecompiledHeaderOutputFile>
+      <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
+      <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
+      <SmallerTypeCheck>false</SmallerTypeCheck>
+      <BasicRuntimeChecks>Default</BasicRuntimeChecks>
+      <WholeProgramOptimization>true</WholeProgramOptimization>
+      <OmitFramePointers>true</OmitFramePointers>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>false</GenerateDebugInformation>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <AdditionalLibraryDirectories>D:\Program Files\Microsoft DirectX SDK %28June 2010%29\Lib\x86;..\SDL\lib\x86;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>SDL.lib;SDLmain.lib;winmm.lib;d3d9.lib;d3dx9.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <IgnoreAllDefaultLibraries>
+      </IgnoreAllDefaultLibraries>
+      <IgnoreSpecificDefaultLibraries>
+      </IgnoreSpecificDefaultLibraries>
+      <ImageHasSafeExceptionHandlers>false</ImageHasSafeExceptionHandlers>
+      <ShowProgress>NotSet</ShowProgress>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="CookieboyCPU.cpp" />
+    <ClCompile Include="CookieboyEmulator.cpp" />
+    <ClCompile Include="CookieboyGPU.cpp" />
+    <ClCompile Include="CookieboyJoypad.cpp" />
+    <ClCompile Include="CookieboyInterrupts.cpp" />
+    <ClCompile Include="CookieboyMemory.cpp" />
+    <ClCompile Include="CookieboyROMInfo.cpp" />
+    <ClCompile Include="CookieboySound.cpp" />
+    <ClCompile Include="CookieboySoundUnit1.cpp" />
+    <ClCompile Include="CookieboySoundUnit2.cpp" />
+    <ClCompile Include="CookieboySoundUnit3.cpp" />
+    <ClCompile Include="CookieboySoundUnit4.cpp" />
+    <ClCompile Include="main.cpp" />
+    <ClCompile Include="render.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="AudioQueue.h" />
+    <ClInclude Include="CookieboyCPU.h" />
+    <ClInclude Include="CookieboyDividerTimer.h" />
+    <ClInclude Include="CookieboyEmulator.h" />
+    <ClInclude Include="CookieboyGPU.h" />
+    <ClInclude Include="CookieboyJoypad.h" />
+    <ClInclude Include="CookieboyInterrupts.h" />
+    <ClInclude Include="CookieboyLengthCounter.h" />
+    <ClInclude Include="CookieboyLFSR.h" />
+    <ClInclude Include="CookieboyMBC1.h" />
+    <ClInclude Include="CookieboyMBC2.h" />
+    <ClInclude Include="CookieboyMBC3.h" />
+    <ClInclude Include="CookieboyMBC5.h" />
+    <ClInclude Include="CookieboyMBC_MMM01.h" />
+    <ClInclude Include="CookieboyMBC_ROMOnly.h" />
+    <ClInclude Include="CookieboyMemory.h" />
+    <ClInclude Include="CookieboyROMInfo.h" />
+    <ClInclude Include="CookieboySerialIO.h" />
+    <ClInclude Include="CookieboySound.h" />
+    <ClInclude Include="CookieboyDutyUnit.h" />
+    <ClInclude Include="CookieboySoundUnit1.h" />
+    <ClInclude Include="CookieboySoundUnit2.h" />
+    <ClInclude Include="CookieboySoundUnit3.h" />
+    <ClInclude Include="CookieboySoundUnit4.h" />
+    <ClInclude Include="CookieboyEnvelopeUnit.h" />
+    <ClInclude Include="CookieboySweepUnit.h" />
+    <ClInclude Include="CookieboyTIMATimer.h" />
+    <ClInclude Include="CookieboyMBC.h" />
+    <ClInclude Include="CookieboyDefs.h" />
+    <ClInclude Include="render.h" />
+    <ClInclude Include="RingBuffer.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="LFSR15.inc" />
+    <None Include="LFSR7.inc" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>
