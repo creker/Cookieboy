@@ -11,3 +11,15 @@ Main features:
 -Full LCD emulation. Background, window, sprites.
 -Pretty accurate LCD controller timings emulation. Passes blargg's lcd-sync.gb test.
 -Accurate sound emulation. Passes all blargg's sound tests expect Wave pattern RAM ones.
+
+Key mapping:
+Up:     Up
+Down:   Down
+Left:   Left
+Right:  Right
+A:      Z
+B:      X
+Start:  S
+Select: A
+
+By default emulator runs at normal Gameboy speed. Press "Space" to run at maximum speed (depends on your PC).
