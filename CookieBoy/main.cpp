@@ -82,54 +82,52 @@ LRESULT CALLBACK WindowProcedure(HWND hWnd, UINT uMessage, WPARAM wParam, LPARAM
 		break;
 	}
 
-    return DefWindowProc(hWnd,uMessage,wParam,lParam);
+	return DefWindowProc(hWnd,uMessage,wParam,lParam);
 }
 
 bool MakeWindow(HINSTANCE hInstance)
 {
-    WNDCLASSEX wc;
+	WNDCLASSEX wc;
 
-    wc.cbSize = sizeof(WNDCLASSEX);
-    wc.style = CS_HREDRAW | CS_VREDRAW;
-    wc.lpfnWndProc = WindowProcedure;
-    wc.cbClsExtra = 0;
-    wc.cbWndExtra = 0;
-    wc.hInstance = hInstance;
-    wc.hIcon = NULL;
-    wc.hCursor = NULL;
-    wc.hbrBackground = (HBRUSH)GetStockObject(BLACK_BRUSH);
-    wc.lpszMenuName = NULL;
-    wc.lpszClassName = "Cookieboy";
-    wc.hIconSm = LoadIcon(hInstance, MAKEINTRESOURCE(5));
-
-    if (!RegisterClassEx(&wc))
+	wc.cbSize = sizeof(WNDCLASSEX);
+	wc.style = CS_HREDRAW | CS_VREDRAW;
+	wc.lpfnWndProc = WindowProcedure;
+	wc.cbClsExtra = 0;
+	wc.cbWndExtra = 0;
+	wc.hInstance = hInstance;
+	wc.hIcon = NULL;
+	wc.hCursor = NULL;
+	wc.hbrBackground = (HBRUSH)GetStockObject(BLACK_BRUSH);
+	wc.lpszMenuName = NULL;
+	wc.lpszClassName = "Cookieboy";
+	wc.hIconSm = LoadIcon(hInstance, MAKEINTRESOURCE(5));
+	
+	if (!RegisterClassEx(&wc))
 	{
-        return true;
+		return true;
 	}
-
-	DWORD wndStyle = WS_CAPTION | WS_VISIBLE | WS_SYSMENU | WS_MAXIMIZEBOX | WS_MINIMIZEBOX | WS_THICKFRAME;
-
+	
 	RECT rect;
 	rect.top = 0;
 	rect.left = 0;
 	rect.right = 160 * 4;
 	rect.bottom = 144 * 4;
-	AdjustWindowRect(&rect, wndStyle, FALSE);
+	AdjustWindowRect(&rect, WS_OVERLAPPEDWINDOW, FALSE);
 	
 	int x = (GetSystemMetrics(SM_CXSCREEN) - rect.right)/2;
 	int y = (GetSystemMetrics(SM_CYSCREEN) - rect.bottom)/2;
 
-	hWnd = CreateWindowEx(NULL, "Cookieboy", "Cookieboy", wndStyle, x, y, rect.right - rect.left, rect.bottom - rect.top, NULL, NULL, hInstance, NULL);
+	hWnd = CreateWindowEx(NULL, "Cookieboy", "Cookieboy", WS_OVERLAPPEDWINDOW, x, y, rect.right - rect.left, rect.bottom - rect.top, NULL, NULL, hInstance, NULL);
 
-    if (!hWnd)
+	if (!hWnd)
 	{
-        return true;
+		return true;
 	}
-
-    return false;
+	
+	return false;
 }
 
-int main(int argc, char *argv[])
+int WINAPI CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd)
 {
 	AllocConsole();
 	HANDLE lStdHandle = GetStdHandle(STD_OUTPUT_HANDLE);
@@ -139,12 +137,14 @@ int main(int argc, char *argv[])
 
 	SDL_Init(SDL_INIT_AUDIO);
 
-	if (MakeWindow(NULL))
+	if (MakeWindow(hInstance))
 	{
 		return 0;
 	}
-
+	
 	InitD3D(hWnd);
+
+	ShowWindow(hWnd, SW_SHOW);
 
 	backbuffer = CreateBackbuffer(160, 144);
 	
@@ -174,8 +174,7 @@ int main(int argc, char *argv[])
 	}
 	
 	const Cookieboy::ROMInfo *ROM = emulator.LoadROM(ofn.lpstrFile);
-	//const Cookieboy::ROMInfo *ROM = emulator.LoadROM("D:\\dev\\gamebuyemu_refactored\\ROMs\\Pokemon Yellow (U) [C][!].gbc");
-	//const Cookieboy::ROMInfo *ROM = emulator.LoadROM("D:\\dev\\gamebuyemu_refactored\\ROMs\\Ant Soldiers (Sachen) [!].gb");
+
 	if (ROM == NULL)
 	{
 		return 0;
@@ -198,10 +197,10 @@ int main(int argc, char *argv[])
 	{
 		MSG msg;
 		if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
-        {
-            TranslateMessage(&msg);
-            DispatchMessage(&msg);
-        }
+		{
+			TranslateMessage(&msg);
+			DispatchMessage(&msg);
+		}
 
 		emulator.UpdateJoypad(Joypad);
 		do
