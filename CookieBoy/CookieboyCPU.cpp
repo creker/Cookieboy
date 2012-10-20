@@ -339,7 +339,6 @@ void Cookieboy::CPU::EmulateBIOS()
 
 void Cookieboy::CPU::Step()
 {
-	DWORD timeSpent = 0;
 	WORD immValueW = 0;
 	BYTE immValueB = 0;
 	
@@ -3331,19 +3330,13 @@ void Cookieboy::CPU::Step()
 		#pragma endregion
 
 		default:
-			PC--;
-			assert(false);
-			timeSpent = 4;
 			PRINT_INSTRUCTION(disassembly, "UNKNOWN INSTRUCTION");
 			break;
 	}
 
 #ifdef DEBUG_PRINTCPU
-	if (((BYTE)((GetAsyncKeyState('P') >> 15) & 0x1)))
-	{
-		printf(disassembly);
-		printf("\n");
-	}
+	printf(disassembly);
+	printf("\n");
 #endif
 
 	INT.Step(*this);
