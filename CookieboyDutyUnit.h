@@ -70,6 +70,7 @@ public:
 		//Square duty sequence clocking is disabled until the first trigger
 		if (NRX4 & 0x80)
 		{
+			ClockCounter = 0;
 			Enabled = true;
 		}
 

@@ -189,6 +189,8 @@ void Cookieboy::SoundUnit3::NR34Changed(BYTE value, bool override)
 	//If channel initial set
 	if (value & NR30 & 0x80)
 	{
+		ClockCounter = 0;
+
 		/*if (canAccessWaveRAM)
 		{
 			if ((SampleIndex >> 1) < 4)
