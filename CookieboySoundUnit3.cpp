@@ -16,7 +16,7 @@ Cookieboy::SoundUnit3::~SoundUnit3()
 void Cookieboy::SoundUnit3::TimerStep(DWORD clockDelta)
 {
 	ClockCounter += clockDelta;
-
+	
 	if (ClockCounter >= Period)
 	{
 		int passedPeriods = ClockCounter / Period;
@@ -24,7 +24,7 @@ void Cookieboy::SoundUnit3::TimerStep(DWORD clockDelta)
 		
 		SampleIndex = (SampleIndex + passedPeriods) & 0x1F;
 		SampleBuffer = WaveRAM[SampleIndex >> 1];
-
+		
 		Output = (SampleBuffer >> (4 * ((~SampleIndex) & 0x1))) & 0xF;
 		switch ((NR32 >> 5) & 0x3)
 		{
@@ -90,13 +90,12 @@ void Cookieboy::SoundUnit3::EmulateBIOS()
 	Reset();
 }
 
-//While sound 1 is on Wave pattern RAM can be read or written only when sound 3 reads samples from it.
+//While sound 3 is ON Wave pattern RAM can be read or written only when sound 3 reads samples from it
 BYTE Cookieboy::SoundUnit3::GetWaveRAM(BYTE pos)
 { 
-	return WaveRAM[pos];
-	/*if (StatusBit)
+	if (StatusBit)
 	{
-		if (canAccessWaveRAM)
+		if (ClockCounter == 3)
 		{
 			return WaveRAM[SampleIndex >> 1];
 		}
@@ -108,15 +107,14 @@ BYTE Cookieboy::SoundUnit3::GetWaveRAM(BYTE pos)
 	else
 	{
 		return WaveRAM[pos];
-	}*/
+	}
 }
 
 void Cookieboy::SoundUnit3::WaveRAMChanged(BYTE pos, BYTE value)
 { 
-	WaveRAM[pos] = value;
-	/*if (StatusBit)
+	if (StatusBit)
 	{
-		if (canAccessWaveRAM)
+		if (ClockCounter == 3)
 		{
 			WaveRAM[SampleIndex >> 1] = value;
 		}
@@ -124,7 +122,7 @@ void Cookieboy::SoundUnit3::WaveRAMChanged(BYTE pos, BYTE value)
 	else
 	{
 		WaveRAM[pos] = value;
-	}*/
+	}
 }
 
 //Sound on/off
@@ -189,27 +187,23 @@ void Cookieboy::SoundUnit3::NR34Changed(BYTE value, bool override)
 	//If channel initial set
 	if (value & NR30 & 0x80)
 	{
-		ClockCounter = 0;
-
-		/*if (canAccessWaveRAM)
+		//Triggering while channel is enabled leads to wave pattern RAM corruption
+		if (ClockCounter == 1)
 		{
-			if ((SampleIndex >> 1) < 4)
+			int waveRAMPos = SampleIndex >> 1;
+			if (waveRAMPos < 4)
 			{
-				WaveRAM[0] = WaveRAM[SampleIndex >> 1];
+				WaveRAM[0] = WaveRAM[waveRAMPos];
 			}
 			else
 			{
-				int alignedIndex = (SampleIndex >> 1) & 0xFC;
-				WaveRAM[0] = WaveRAM[alignedIndex];
-				WaveRAM[1] = WaveRAM[alignedIndex + 1];
-				WaveRAM[2] = WaveRAM[alignedIndex + 2];
-				WaveRAM[3] = WaveRAM[alignedIndex + 3];
+				memcpy(WaveRAM, WaveRAM + (waveRAMPos & 0xFC), 4); 
 			}
-		}*/
-		
-		//Switching to first sample
-		//Sample buffer is not updated until next timer clock
-		SampleIndex = 0;
+		}
+
+		//Mostly guesswork
+		ClockCounter = -Period - 3;
+		SampleIndex = 1;
 
 		//If sound 3 On
 		StatusBit = 1;

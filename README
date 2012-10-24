@@ -9,8 +9,8 @@ Main features:
 -Full emulation of several ROM MBC's: MBC1, MBC2, MBC3 with RTC, MBC5, MMM01. 
 -Supports battery powered external RAM.
 -Full LCD emulation. Background, window, sprites.
--Pretty accurate LCD controller timings emulation. Passes blargg's lcd-sync.gb test.
--Accurate sound emulation. Passes all blargg's sound tests expect Wave pattern RAM ones.
+-Pretty accurate LCD controller timings emulation with OAM and VRAM locking. Passes blargg's lcd-sync.gb test.
+-Accurate sound emulation. Passes all blargg's sound tests - DMG sound tests and CGB sound tests in DMG mode.
 
 Key mapping:
 Up:     Up
