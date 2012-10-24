@@ -15,6 +15,11 @@ Cookieboy::SoundUnit3::~SoundUnit3()
 
 void Cookieboy::SoundUnit3::TimerStep(DWORD clockDelta)
 {
+	if (ClockCounter < 0 && (ClockCounter + clockDelta) >= 0)
+	{
+		SampleBuffer = WaveRAM[SampleIndex >> 1];
+	}
+
 	ClockCounter += clockDelta;
 	
 	if (ClockCounter >= Period)
