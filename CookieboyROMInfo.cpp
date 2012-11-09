@@ -286,7 +286,7 @@ void Cookieboy::ROMInfo::ReadROMInfo(const BYTE* ROMBytes)
 {
 	memcpy(gameTitle, ROMBytes + 0x134, 16);
 	
-	colorGB = ROMBytes[0x143] == 0x80;
+	colorGB = ROMBytes[0x143] == 0x80 || ROMBytes[0x143] == 0xC0;
 	superGB = ROMBytes[0x146] == 0x03;
 	ROMSize = ROMSizes[ROMBytes[0x148]];
 	RAMSize = RAMSizes[ROMBytes[0x149]];
