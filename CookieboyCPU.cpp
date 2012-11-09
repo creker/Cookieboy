@@ -38,12 +38,23 @@ Passed tests
 */
 
 #define SYNC_WITH_CPU(clockDelta)	\
-	GPU.Step(clockDelta, INT);		\
+	GPU.Step(clockDelta, INT, MMU);	\
 	DIV.Step(clockDelta);			\
 	TIMA.Step(clockDelta, INT);		\
 	Serial.Step(clockDelta, INT);	\
 	Joypad.Step(INT);				\
 	Sound.Step(clockDelta);
+
+//Using this to replace conditionals with bitwise operations. Should be extremly careful using it - assumes operands and calculations are 32-bit
+#define EQUALS_ZERO(value) ((~((value) | (~(value) + 1)) >> 31) & 0x1)
+#define ARE_EQUAL(A, B) ((~(((A) - (B)) | ((B) - (A))) >> 31) & 0x1)
+#define IS_NEGATIVE(value) (((value) >> 31) & 0x1)
+#define A_SMALLER_THAN_B(A, B) (IS_NEGATIVE((A) - (B)))
+
+#define IS_CARRY4(value) (((value) >> 4) & 0x1)
+#define IS_CARRY8(value) (((value) >> 8) & 0x1)
+#define IS_CARRY12(value) (((value) >> 12) & 0x1)
+#define IS_CARRY16(value) (((value) >> 16) & 0x1)
 
 //Zero flag (7 bit) - set when the result of a math operation is zero or two values match when using the CP instruction.
 #define SET_FLAG_Z(value) (F = ((value) << 7) | (F & 0x7F))
@@ -61,92 +72,97 @@ Passed tests
 #define GET_FLAG_N() ((F >> 6) & 0x1)
 #define GET_FLAG_H() ((F >> 5) & 0x1)
 #define GET_FLAG_C() ((F >> 4) & 0x1)
+	
+#define DELAYED_JUMP(value)	\
+	{PC = (value);			\
+							\
+	SYNC_WITH_CPU(4);}
 
 #define ADD_N(value)										\
-	{SET_FLAG_Z(((A + (value)) & 0xFF) == 0);				\
+	{SET_FLAG_Z(EQUALS_ZERO((A + (value)) & 0xFF));			\
 	SET_FLAG_N(0);											\
-	SET_FLAG_H((((A & 0xF) + ((value) & 0xF)) >> 4) & 0x1);	\
-	SET_FLAG_C(((A + (value)) >> 8) & 0x1);					\
+	SET_FLAG_H(IS_CARRY4((A & 0xF) + ((value) & 0xF)));		\
+	SET_FLAG_C(IS_CARRY8(A + (value)));						\
 															\
 	A += (value);}
 
 #define ADC_N(value)												\
 	{int FlagC = GET_FLAG_C();										\
 																	\
-	SET_FLAG_Z(((A + (value) + FlagC) & 0xFF) == 0);				\
+	SET_FLAG_Z(EQUALS_ZERO((A + (value) + FlagC) & 0xFF));			\
 	SET_FLAG_N(0);													\
-	SET_FLAG_H((((A & 0xF) + ((value) & 0xF) + FlagC) >> 4) & 0x1);	\
-	SET_FLAG_C(((A + (value) + FlagC) >> 8) & 0x1);					\
+	SET_FLAG_H(IS_CARRY4((A & 0xF) + ((value) & 0xF) + FlagC));		\
+	SET_FLAG_C(IS_CARRY8(A + (value) + FlagC));						\
 																	\
 	A += (value) + FlagC;}
 
-#define SBC_N(value)										\
-	{int result = A - (value) - GET_FLAG_C();				\
-															\
-	SET_FLAG_N(1);											\
-	SET_FLAG_H((A & 0xF) < ((value) & 0xF) + GET_FLAG_C());	\
-	SET_FLAG_C(result < 0);									\
-															\
-	A = result;												\
-															\
-	SET_FLAG_Z(A == 0);}
+#define SBC_N(value)														\
+	{int result = A - (value) - GET_FLAG_C();								\
+																			\
+	SET_FLAG_N(1);															\
+	SET_FLAG_H(A_SMALLER_THAN_B(A & 0xF, ((value) & 0xF) + GET_FLAG_C()));	\
+	SET_FLAG_C(IS_NEGATIVE(result));										\
+																			\
+	A = result;																\
+																			\
+	SET_FLAG_Z(EQUALS_ZERO(A));}
 
-#define SUB_N(value)						\
-	{SET_FLAG_Z(A == (value));				\
-	SET_FLAG_N(1);							\
-	SET_FLAG_H((A & 0xF) < ((value) & 0xF));\
-	SET_FLAG_C(A < (value));}				\
-											\
+#define SUB_N(value)											\
+	{SET_FLAG_Z(ARE_EQUAL(A, value));							\
+	SET_FLAG_N(1);												\
+	SET_FLAG_H(A_SMALLER_THAN_B(A & 0xF, (value) & 0xF));		\
+	SET_FLAG_C(A_SMALLER_THAN_B(A, value));}					\
+																\
 	A -= (value);
 
-#define AND_N(value)	\
-	{A &= (value);		\
-						\
-	SET_FLAG_Z(A == 0);	\
-	SET_FLAG_N(0);		\
-	SET_FLAG_H(1);		\
+#define AND_N(value)			\
+	{A &= (value);				\
+								\
+	SET_FLAG_Z(EQUALS_ZERO(A));	\
+	SET_FLAG_N(0);				\
+	SET_FLAG_H(1);				\
 	SET_FLAG_C(0);}
 
-#define OR_N(value)		\
-	{A |= (value);		\
-						\
-	SET_FLAG_Z(A == 0);	\
-	SET_FLAG_N(0);		\
-	SET_FLAG_H(0);		\
+#define OR_N(value)				\
+	{A |= (value);				\
+								\
+	SET_FLAG_Z(EQUALS_ZERO(A));	\
+	SET_FLAG_N(0);				\
+	SET_FLAG_H(0);				\
 	SET_FLAG_C(0);}
 
-#define XOR_N(value)	\
-	{A ^= (value);		\
-						\
-	SET_FLAG_Z(A == 0);	\
-	SET_FLAG_N(0);		\
-	SET_FLAG_H(0);		\
+#define XOR_N(value)			\
+	{A ^= (value);				\
+								\
+	SET_FLAG_Z(EQUALS_ZERO(A));	\
+	SET_FLAG_N(0);				\
+	SET_FLAG_H(0);				\
 	SET_FLAG_C(0);}
 
-#define CP_N(value)							\
-	{SET_FLAG_Z(A == (value));				\
-	SET_FLAG_N(1);							\
-	SET_FLAG_H((A & 0xF) < ((value) & 0xF));\
-	SET_FLAG_C(A < (value));}
+#define CP_N(value)											\
+	{SET_FLAG_Z(ARE_EQUAL(A, value));						\
+	SET_FLAG_N(1);											\
+	SET_FLAG_H(A_SMALLER_THAN_B(A & 0xF, (value) & 0xF));	\
+	SET_FLAG_C(A_SMALLER_THAN_B(A, value));}
 
 #define INC_N(value)								\
-	{SET_FLAG_Z((((value) + 1) & 0xFF) == 0);		\
+	{SET_FLAG_Z(EQUALS_ZERO(((value) + 1) & 0xFF));	\
 	SET_FLAG_N(0);									\
-	SET_FLAG_H(((((value) & 0xF) + 1) >> 4) & 0x1);	\
+	SET_FLAG_H(IS_CARRY4(((value) & 0xF) + 1));		\
 													\
 	value++;}
 
-#define DEC_N(value)					\
-	{SET_FLAG_Z((value) == 1);			\
-	SET_FLAG_N(1);						\
-	SET_FLAG_H(((value) & 0xF) < 1);	\
-										\
+#define DEC_N(value)								\
+	{SET_FLAG_Z(EQUALS_ZERO((value) - 1));			\
+	SET_FLAG_N(1);									\
+	SET_FLAG_H(IS_NEGATIVE(((value) & 0xF) - 1));	\
+													\
 	(value)--;}
 
 #define ADD_HL(value)													\
 	{SET_FLAG_N(0);														\
-	SET_FLAG_H((((HL.word & 0xFFF) + ((value) & 0xFFF)) >> 12) & 0x1);	\
-	SET_FLAG_C(((HL.word + (value)) >> 16) & 0x1);						\
+	SET_FLAG_H(IS_CARRY12((HL.word & 0xFFF) + ((value) & 0xFFF)));		\
+	SET_FLAG_C(IS_CARRY16(HL.word + (value)));							\
 																		\
 	HL.word += (value);													\
 																		\
@@ -168,7 +184,7 @@ Passed tests
 									\
 	if ((condition))				\
 	{								\
-		DelayedPCChange(addr);		\
+		DELAYED_JUMP(addr);			\
 	}}
 
 #define JR_CC_NN(condition)				\
@@ -177,7 +193,7 @@ Passed tests
 										\
 	if ((condition))					\
 	{									\
-		DelayedPCChange(PC + addr);		\
+		DELAYED_JUMP(PC + addr);		\
 	}}
 
 #define CALL_CC_NN(condition)		\
@@ -201,13 +217,13 @@ Passed tests
 											\
 	if ((condition))						\
 	{										\
-		DelayedPCChange(StackPopWord());	\
+		DELAYED_JUMP(StackPopWord());		\
 	}}
 
 #define SWAP_N(value)											\
 	{(value) = (((value) & 0xF) << 4) | (((value) & 0xF0) >> 4);\
 																\
-	SET_FLAG_Z((value) == 0);									\
+	SET_FLAG_Z(EQUALS_ZERO(value));								\
 	SET_FLAG_N(0);												\
 	SET_FLAG_H(0);												\
 	SET_FLAG_C(0);}
@@ -217,7 +233,7 @@ Passed tests
 									\
 	(value) = ((value) << 1) | MSB;	\
 									\
-	SET_FLAG_Z((value) == 0);		\
+	SET_FLAG_Z(EQUALS_ZERO(value));	\
 	SET_FLAG_H(0);					\
 	SET_FLAG_N(0);					\
 	SET_FLAG_C(MSB);}
@@ -227,7 +243,7 @@ Passed tests
 											\
 	(value) = ((value) << 1) | GET_FLAG_C();\
 											\
-	SET_FLAG_Z((value) == 0);				\
+	SET_FLAG_Z(EQUALS_ZERO(value));			\
 	SET_FLAG_N(0);							\
 	SET_FLAG_H(0);							\
 	SET_FLAG_C(MSB);}
@@ -237,7 +253,7 @@ Passed tests
 											\
 	(value) = ((value) >> 1) | (LSB << 7);	\
 											\
-	SET_FLAG_Z((value) == 0);				\
+	SET_FLAG_Z(EQUALS_ZERO(value));			\
 	SET_FLAG_H(0);							\
 	SET_FLAG_N(0);							\
 	SET_FLAG_C(LSB);}
@@ -247,19 +263,19 @@ Passed tests
 													\
 	(value) = ((value) >> 1) | (GET_FLAG_C() << 7);	\
 													\
-	SET_FLAG_Z((value) == 0);						\
+	SET_FLAG_Z(EQUALS_ZERO(value));					\
 	SET_FLAG_H(0);									\
 	SET_FLAG_N(0);									\
 	SET_FLAG_C(LSB);}
 
-#define SLA_N(value)			\
-	{BYTE MSB = (value) >> 7;	\
-								\
-	(value) <<= 1;				\
-								\
-	SET_FLAG_Z((value) == 0);	\
-	SET_FLAG_H(0);				\
-	SET_FLAG_N(0);				\
+#define SLA_N(value)				\
+	{BYTE MSB = (value) >> 7;		\
+									\
+	(value) <<= 1;					\
+									\
+	SET_FLAG_Z(EQUALS_ZERO(value));	\
+	SET_FLAG_H(0);					\
+	SET_FLAG_N(0);					\
 	SET_FLAG_C(MSB);}
 
 #define SRA_N(value)							\
@@ -267,19 +283,19 @@ Passed tests
 												\
 	(value) = ((value) >> 1) | ((value) & 0x80);\
 												\
-	SET_FLAG_Z((value) == 0);					\
+	SET_FLAG_Z(EQUALS_ZERO(value));				\
 	SET_FLAG_H(0);								\
 	SET_FLAG_N(0);								\
 	SET_FLAG_C(LSB);}
 
-#define SRL_N(value)			\
-	{BYTE LSB = (value) & 0x1;	\
-								\
-	(value) >>= 1;				\
-								\
-	SET_FLAG_Z((value) == 0);	\
-	SET_FLAG_H(0);				\
-	SET_FLAG_N(0);				\
+#define SRL_N(value)				\
+	{BYTE LSB = (value) & 0x1;		\
+									\
+	(value) >>= 1;					\
+									\
+	SET_FLAG_Z(EQUALS_ZERO(value));	\
+	SET_FLAG_H(0);					\
+	SET_FLAG_N(0);					\
 	SET_FLAG_C(LSB);}
 
 #define BITX_N(BitIndex, value)						\
@@ -1712,7 +1728,7 @@ void Cookieboy::CPU::Step()
 			immValueW = MemoryReadWord(PC);
 			PC += 2;
 
-			DelayedPCChange(immValueW);
+			DELAYED_JUMP(immValueW);
 
 			PRINT_INSTRUCTION(disassembly, "JP 0x%X", immValueW);
 			break;
@@ -1751,7 +1767,7 @@ void Cookieboy::CPU::Step()
 			immValueB = MemoryRead(PC);
 			PC++;
 
-			DelayedPCChange(PC + (signed char)immValueB);
+			DELAYED_JUMP(PC + (signed char)immValueB);
 
 			PRINT_INSTRUCTION(disassembly, "JR 0x%X", immValueB);
 			break;
@@ -1856,7 +1872,7 @@ void Cookieboy::CPU::Step()
 		#pragma endregion
 		#pragma region RET
 		case 0xC9:
-			DelayedPCChange(StackPopWord());
+			DELAYED_JUMP(StackPopWord());
 			
 			PRINT_INSTRUCTION(disassembly, "RET");
 			break;
@@ -1885,7 +1901,7 @@ void Cookieboy::CPU::Step()
 		#pragma endregion
 		#pragma region RETI
 		case 0xD9:
-			DelayedPCChange(StackPopWord());
+			DELAYED_JUMP(StackPopWord());
 			IME = 1;
 
 			PRINT_INSTRUCTION(disassembly, "RETI");
@@ -3371,13 +3387,6 @@ void Cookieboy::CPU::MemoryWriteWord(WORD addr, WORD value)
 {
 	MemoryWrite(addr, value & 0xFF);
 	MemoryWrite(addr + 1, (value & 0xFF00) >> 8);
-}
-
-void Cookieboy::CPU::DelayedPCChange(WORD value)
-{
-	PC = value;
-
-	SYNC_WITH_CPU(4);
 }
 
 void Cookieboy::CPU::INTJump(WORD address)

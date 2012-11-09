@@ -61,7 +61,6 @@ private:
 	void MemoryWrite(WORD addr, BYTE value);
 	void MemoryWriteWord(WORD addr, WORD value);
 
-	void DelayedPCChange(WORD value);
 	void INTJump(WORD address);
 
 	//CPU Microcode
