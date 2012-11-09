@@ -152,30 +152,66 @@ public:
 				}
 				else if (Mode == RTCRegisterMapping)
 				{
-					if (SelectedRTCRegister == RTC_DH)
+					switch (SelectedRTCRegister)
 					{
-						BYTE oldDH = RTCRegisters[SelectedRTCRegister];
-						RTCRegisters[SelectedRTCRegister] = value;
-						ReloadBaseTime();
-
-						//Halt flag stops timer clock
-						if ((oldDH ^ value) & 0x40)
+					case RTC_S:
 						{
-							if (value & 0x40)
+							time_t oldBasetime = (RTCRegisters[RTC_DH] & 0x40) ? HaltTime : std::time(NULL);
+							BaseTime += (oldBasetime - BaseTime) % 60;
+							BaseTime -= value;
+						}
+						break;
+
+					case RTC_M:
+						{
+							time_t oldBasetime = (RTCRegisters[RTC_DH] & 0x40) ? HaltTime : std::time(NULL);
+							time_t oldMinutes = ((oldBasetime - BaseTime) / 60) % 60;
+							BaseTime += oldMinutes * 60;
+							BaseTime -= value * 60;
+						}
+						break;
+
+					case RTC_H:
+						{
+							time_t oldBasetime = (RTCRegisters[RTC_DH] & 0x40) ? HaltTime : std::time(NULL);
+							time_t oldHours = ((oldBasetime - BaseTime) / 3600) % 24;
+							BaseTime += oldHours * 3600;
+							BaseTime -= value * 3600;
+						}
+						break;
+
+					case RTC_DL:
+						{
+							time_t oldBasetime = (RTCRegisters[RTC_DH] & 0x40) ? HaltTime : std::time(NULL);
+							time_t oldLowDays = ((oldBasetime - BaseTime) / 86400) % 0xFF;
+							BaseTime += oldLowDays * 86400;
+							BaseTime -= value * 86400;
+						}
+						break;
+
+					case RTC_DH:
+						{
+							time_t oldBasetime = (RTCRegisters[RTC_DH] & 0x40) ? HaltTime : std::time(NULL);
+							time_t oldHighDays = ((oldBasetime - BaseTime) / 86400) & 0x100;
+							BaseTime += oldHighDays * 86400;
+							BaseTime -= ((value & 0x1) << 8) * 86400;
+
+							if ((RTCRegisters[RTC_DH] ^ value) & 0x40)
 							{
-								HaltTime = std::time(NULL);
-							}
-							else
-							{
-								BaseTime += std::time(NULL) - HaltTime;
+								if (value & 0x40)
+								{
+									HaltTime = std::time(NULL);
+								}
+								else
+								{
+									BaseTime +=	std::time(NULL) - HaltTime;
+								}
 							}
 						}
+						break;
 					}
-					else
-					{
-						RTCRegisters[SelectedRTCRegister] = value;
-						ReloadBaseTime();
-					}
+
+					RTCRegisters[SelectedRTCRegister] = value;
 				}
 			}
 			break;
@@ -229,8 +265,8 @@ public:
 		}
 
 		fwrite(RAMBanks, RAMSize, 1, file);
-		fwrite(&BaseTime, sizeof(BaseTime), 1, file);
 
+		fwrite(&BaseTime, sizeof(BaseTime), 1, file);
 		fwrite(&HaltTime, sizeof(HaltTime), 1, file);
 		fwrite(RTCRegisters, sizeof(BYTE), 5, file);
 
@@ -251,6 +287,7 @@ public:
 
 		fread(RAMBanks, RAMSize, 1, file);
 
+		fread(&BaseTime, sizeof(BaseTime), 1, file);
 		fread(&HaltTime, sizeof(HaltTime), 1, file);
 		fread(RTCRegisters, sizeof(BYTE), 5, file);
 
@@ -263,50 +300,31 @@ public:
 private:
 	void LatchRTCData()
 	{
-		time_t timeDiff = ((RTCRegisters[RTC_DH] >> 6) & 0x1) ? HaltTime - BaseTime : std::time(NULL) - BaseTime;
+		time_t passedTime = (RTCRegisters[RTC_DH] & 0x40) ? HaltTime : std::time(NULL) - BaseTime;
 
-		if (timeDiff > 0x1FF * 86400)
+		if (passedTime > 0x1FF * 86400)
 		{
-			while (timeDiff > 0x1FF * 86400)
+			do
 			{
-				timeDiff -= 0x1FF * 86400;
+				passedTime -= 0x1FF * 86400;
 				BaseTime += 0x1FF * 86400;
-			}
+			}while (passedTime > 0x1FF * 86400);
 
 			RTCRegisters[RTC_DH] |= 0x80;//Day counter overflow
 		}
 
-		int dayCounter = (timeDiff / 86400) & 0x1FF;
-		RTCRegisters[RTC_DL] = dayCounter & 0xFF;
-		RTCRegisters[RTC_DH] |= dayCounter >> 8;
-		timeDiff %= 86400;
+		RTCRegisters[RTC_DL] = (passedTime / 86400) & 0xFF;
+		RTCRegisters[RTC_DH] &= 0xFE;
+		RTCRegisters[RTC_DH] |= ((passedTime / 86400) & 0x100) >> 8;
+		passedTime %= 86400;
 
-		RTCRegisters[RTC_H] = (timeDiff / 3600) & 0xFF;
-		timeDiff %= 3600;
+		RTCRegisters[RTC_H] = passedTime / 3600;
+		passedTime %= 3600;
 
-		RTCRegisters[RTC_M] = (timeDiff / 60) & 0xFF;
-		timeDiff %= 60;
+		RTCRegisters[RTC_M] = passedTime / 60;
+		passedTime %= 60;
 
-		RTCRegisters[RTC_S] = timeDiff & 0xFF;
-	}
-
-	void ReloadBaseTime()
-	{
-		if (RTCRegisters[RTC_DH] & 0x40)
-		{
-			BaseTime = HaltTime;
-		}
-		else
-		{
-			BaseTime = std::time(NULL);
-		}
-
-		int dayCounter = (RTCRegisters[RTC_DH] << 8) | RTCRegisters[RTC_DL];
-		BaseTime -= dayCounter * 86400;
-
-		BaseTime -= RTCRegisters[RTC_H] * 3600;
-		BaseTime -= RTCRegisters[RTC_M] * 60;
-		BaseTime -= RTCRegisters[RTC_S];
+		RTCRegisters[RTC_S] = passedTime;
 	}
 
 	BYTE RTCRegisters[5];
