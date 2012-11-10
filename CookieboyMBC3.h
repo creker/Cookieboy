@@ -318,13 +318,13 @@ private:
 		RTCRegisters[RTC_DH] |= ((passedTime / 86400) & 0x100) >> 8;
 		passedTime %= 86400;
 
-		RTCRegisters[RTC_H] = passedTime / 3600;
+		RTCRegisters[RTC_H] = (passedTime / 3600) & 0xFF;
 		passedTime %= 3600;
 
-		RTCRegisters[RTC_M] = passedTime / 60;
+		RTCRegisters[RTC_M] = (passedTime / 60) & 0xFF;
 		passedTime %= 60;
 
-		RTCRegisters[RTC_S] = passedTime;
+		RTCRegisters[RTC_S] = passedTime & 0xFF;
 	}
 
 	BYTE RTCRegisters[5];
