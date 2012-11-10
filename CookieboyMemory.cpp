@@ -94,7 +94,7 @@ const Cookieboy::ROMInfo* Cookieboy::Memory::LoadROM(const char* ROMPath, Emulat
 	}
 
 	SaveRAM();
-	Reset();
+	Reset(true);
 
 	fseek(file, 0, SEEK_END);
 	int filesize = ftell(file);
@@ -104,10 +104,11 @@ const Cookieboy::ROMInfo* Cookieboy::Memory::LoadROM(const char* ROMPath, Emulat
 	if (fread(ROM, 1, filesize, file) != filesize)
 	{
 		delete[] ROM;
-
+		ROM = NULL;
 		ROMLoaded = false;
 
 		fclose(file);
+
 		return NULL;
 	}
 
@@ -189,9 +190,9 @@ const Cookieboy::ROMInfo* Cookieboy::Memory::LoadROM(const char* ROMPath, Emulat
 		break;
 
 	default:
-		ROMLoaded = false;
 		delete[] ROM;
 		ROM = NULL;
+		ROMLoaded = false;
 
 		return NULL;
 	}
@@ -240,27 +241,32 @@ const Cookieboy::ROMInfo* Cookieboy::Memory::LoadROM(const char* ROMPath, Emulat
 	return &LoadedROMInfo;
 }
 
-void Cookieboy::Memory::Reset()
+void Cookieboy::Memory::Reset(bool clearROM)
 {
-	if (ROM != NULL)
+	if (clearROM)
 	{
-		delete[] ROM;
-	}
-	if (RAMBanks != NULL)
-	{
-		delete[] RAMBanks;
-	}
-	if (MBC != NULL)
-	{
-		delete[] MBC;
+		if (ROM != NULL)
+		{
+			delete[] ROM;
+		}
+		if (RAMBanks != NULL)
+		{
+			delete[] RAMBanks;
+		}
+		if (MBC != NULL)
+		{
+			delete[] MBC;
+		}
+
+		ROM = NULL;
+		RAMBanks = NULL;
+		MBC = NULL;
+
+		ROMLoaded = false;
 	}
 
-	ROM = NULL;
-	RAMBanks = NULL;
-	MBC = NULL;
-
-	ROMLoaded = false;
 	WRAMOffset = WRAMBankSize;
+	InBIOS = true;
 
 	//On power ON gameboy internal RAM is filled with random values
 	srand(clock());

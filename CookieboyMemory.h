@@ -96,7 +96,7 @@ public:
 
 	const ROMInfo* LoadROM(const char* ROMPath, EmulationModes mode = EMULMODE_AUTO);
 	bool IsROMLoaded() { return ROMLoaded; }
-	void Reset();
+	void Reset(bool clearROM = false);
 
 	void EmulateBIOS();
 
