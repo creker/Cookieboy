@@ -269,10 +269,12 @@ void Cookieboy::GPU::LCDCChanged(BYTE value, Interrupts &INT)
 		ClockCounter = 0;
 		ScrollXClocks = 0;
 		LCDCInterrupted = false;
+
 		LY = 0;
 		CheckLYC(INT);
-		SET_LCD_MODE(GBLCDMODE_OAM);
 
+		//When LCD turned on H-blank is active instead of OAM for 80 cycles
+		SET_LCD_MODE(GBLCDMODE_HBLANK);
 		LCDMode = LCDMODE_LYXX_OAMRAM;
 		ClocksToNextState = 80;
 	}
