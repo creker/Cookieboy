@@ -3,6 +3,10 @@
 #include <algorithm>
 
 Cookieboy::Sound::Sound(const bool &_CGB, int sampleRate, int sampleBufferLength):
+Sound1GlobalToggle(1),
+Sound2GlobalToggle(1),
+Sound3GlobalToggle(1),
+Sound4GlobalToggle(1),
 CGB(_CGB),
 SampleRate(sampleRate),
 SampleBufferLength(sampleBufferLength)
@@ -62,8 +66,15 @@ void Cookieboy::Sound::Step(DWORD clockDelta)
 		SampleCounter %= SamplePeriod;
 
 		//Mixing is done by adding voltages from every channel
-		SampleBuffer[SampleBufferPos] = Sound1->GetWaveLeftOutput() + Sound2->GetWaveLeftOutput() + Sound3->GetWaveLeftOutput() + Sound4->GetWaveLeftOutput();
-		SampleBuffer[SampleBufferPos + 1] = Sound1->GetWaveRightOutput() + Sound2->GetWaveRightOutput() + Sound3->GetWaveRightOutput() + Sound4->GetWaveRightOutput();
+		SampleBuffer[SampleBufferPos] = Sound1->GetWaveLeftOutput() * Sound1GlobalToggle +
+										Sound2->GetWaveLeftOutput() * Sound2GlobalToggle + 
+										Sound3->GetWaveLeftOutput() * Sound3GlobalToggle +
+										Sound4->GetWaveLeftOutput() * Sound4GlobalToggle;
+
+		SampleBuffer[SampleBufferPos + 1] = Sound1->GetWaveRightOutput() * Sound1GlobalToggle + 
+											Sound2->GetWaveRightOutput() * Sound2GlobalToggle +
+											Sound3->GetWaveRightOutput() * Sound3GlobalToggle + 
+											Sound4->GetWaveRightOutput() * Sound4GlobalToggle;
 
 		//Amplifying sound
 		//Max amplitude for 16-bit audio is 32767. Max channel volume is 15. Max master volume is 7 + 1

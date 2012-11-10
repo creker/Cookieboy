@@ -41,6 +41,14 @@ public:
 	bool IsNewSoundFrameReady();
 	void WaitForNewSoundFrame();
 
+	void ToggleLCDBackground();
+	void ToggleLCDWindow();
+	void ToggleLCDSprites();
+	void ToggleSound1();
+	void ToggleSound2();
+	void ToggleSound3();
+	void ToggleSound4();
+
 private:
 
 	bool CGB;

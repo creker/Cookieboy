@@ -119,6 +119,12 @@ public:
 	bool IsNewFrameReady() { return NewFrameReady; }
 	void WaitForNewFrame() { NewFrameReady = false; }
 
+	//Debug
+	void ToggleSound1() { Sound1GlobalToggle = ~Sound1GlobalToggle & 0x1; }
+	void ToggleSound2() { Sound2GlobalToggle = ~Sound2GlobalToggle & 0x1; }
+	void ToggleSound3() { Sound3GlobalToggle = ~Sound3GlobalToggle & 0x1; }
+	void ToggleSound4() { Sound4GlobalToggle = ~Sound4GlobalToggle & 0x1; }
+
 private:
 
 	const bool &CGB;
@@ -174,6 +180,12 @@ private:
 	BYTE FrameSequencerStep;
 
 	double MasterVolume;
+
+	//Debug
+	int Sound1GlobalToggle;
+	int Sound2GlobalToggle;
+	int Sound3GlobalToggle;
+	int Sound4GlobalToggle;
 };
 
 }

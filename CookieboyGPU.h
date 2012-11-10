@@ -106,6 +106,11 @@ public:
 	BYTE GetOBPI() { return OBPI | 0x40; }
 	BYTE GetOBPD() { return OBPD[OBPI & 0x3F]; }
 
+	//Debug
+	void ToggleBackground() { BackgroundGlobalToggle = !BackgroundGlobalToggle; }
+	void ToggleWindow() { WindowsGlobalToggle = !WindowsGlobalToggle; }
+	void ToggleSprites() { SpritesGlobalToggle = !SpritesGlobalToggle; }
+
 private:
 
 	//GPU Microcode
@@ -246,6 +251,11 @@ private:
 
 	BYTE WindowLine;
 	int DelayedWY;
+
+	//Debug
+	bool BackgroundGlobalToggle;
+	bool WindowsGlobalToggle;
+	bool SpritesGlobalToggle;
 };
 
 }

@@ -119,3 +119,38 @@ void Cookieboy::Emulator::WaitForNewSoundFrame()
 { 
 	return SPU->WaitForNewFrame(); 
 }
+
+void Cookieboy::Emulator::ToggleLCDBackground()
+{
+	Gpu->ToggleBackground();
+}
+
+void Cookieboy::Emulator::ToggleLCDWindow()
+{
+	Gpu->ToggleWindow();
+}
+
+void Cookieboy::Emulator::ToggleLCDSprites()
+{
+	Gpu->ToggleSprites();
+}
+
+void Cookieboy::Emulator::ToggleSound1()
+{
+	SPU->ToggleSound1();
+}
+
+void Cookieboy::Emulator::ToggleSound2()
+{
+	SPU->ToggleSound2();
+}
+
+void Cookieboy::Emulator::ToggleSound3()
+{
+	SPU->ToggleSound3();
+}
+
+void Cookieboy::Emulator::ToggleSound4()
+{
+	SPU->ToggleSound4();
+}

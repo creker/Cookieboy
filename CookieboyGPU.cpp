@@ -10,6 +10,9 @@
 #define GET_TILE_PIXEL(VRAMAddr, x, y) ((((VRAM[(VRAMAddr) + (y) * 2 + 1] >> (7 - (x))) & 0x1) << 1) | ((VRAM[(VRAMAddr) + (y) * 2] >> (7 - (x))) & 0x1))
 
 Cookieboy::GPU::GPU(const bool &_CGB, Interrupts& INT, DMGPalettes palette) :
+BackgroundGlobalToggle(true),
+WindowsGlobalToggle(true),
+SpritesGlobalToggle(true),
 INT(INT),
 CGB(_CGB)
 {
@@ -527,7 +530,7 @@ void Cookieboy::GPU::OBPDChanged(BYTE value)
 void Cookieboy::GPU::RenderScanline()
 {
 	#pragma region background
-	if ((LCDC & 0x01) || CGB)//Background display
+	if (((LCDC & 0x01) || CGB) && BackgroundGlobalToggle)//Background display
 	{
 		WORD tileMapAddr = (LCDC & 0x8) ? 0x1C00 : 0x1800;
 		WORD tileDataAddr = (LCDC & 0x10) ? 0x0 : 0x800;
@@ -592,7 +595,7 @@ void Cookieboy::GPU::RenderScanline()
 	}
 	#pragma endregion
 	#pragma region window
-	if (LCDC & 0x20)//Window display
+	if ((LCDC & 0x20) && WindowsGlobalToggle)//Window display
 	{
 		if (WX <= 166 && WY <= 143 && WindowLine <= 143 && LY >= WY)//Checking window visibility on the whole screen and in the scanline
 		{
@@ -666,7 +669,7 @@ void Cookieboy::GPU::RenderScanline()
 	}
 	#pragma endregion
 	#pragma region sprites
-	if (LCDC & 0x02)//Object (sprite) display
+	if ((LCDC & 0x02) && SpritesGlobalToggle)//Object (sprite) display
 	{
 		BYTE spriteHeight;
 		BYTE tileIdxMask;

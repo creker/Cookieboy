@@ -66,6 +66,34 @@ LRESULT CALLBACK WindowProcedure(HWND hWnd, UINT uMessage, WPARAM wParam, LPARAM
 		case VK_SPACE:
 			FullSpeed = keyState == 1;
 			break;
+			
+		case VK_F1:
+			if (uMessage == WM_KEYUP) emulator->ToggleLCDBackground();
+			break;
+
+		case VK_F2:
+			if (uMessage == WM_KEYUP) emulator->ToggleLCDWindow();
+			break;
+
+		case VK_F3:
+			if (uMessage == WM_KEYUP) emulator->ToggleLCDSprites();
+			break;
+
+		case VK_F5:
+			if (uMessage == WM_KEYUP) emulator->ToggleSound1();
+			break;
+
+		case VK_F6:
+			if (uMessage == WM_KEYUP) emulator->ToggleSound2();
+			break;
+
+		case VK_F7:
+			if (uMessage == WM_KEYUP) emulator->ToggleSound3();
+			break;
+
+		case VK_F8:
+			if (uMessage == WM_KEYUP) emulator->ToggleSound4();
+			break;
 		}
 		break;
 
