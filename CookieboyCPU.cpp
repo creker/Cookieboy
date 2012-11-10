@@ -38,7 +38,7 @@ Passed tests
 */
 
 #define SYNC_WITH_CPU(clockDelta)	\
-	GPU.Step(clockDelta, INT, MMU);	\
+	GPU.Step(clockDelta, MMU);		\
 	DIV.Step(clockDelta);			\
 	TIMA.Step(clockDelta, INT);		\
 	Serial.Step(clockDelta, INT);	\
@@ -303,7 +303,9 @@ Passed tests
 	SET_FLAG_N(0);									\
 	SET_FLAG_H(1);}
 
-Cookieboy::CPU::CPU(Cookieboy::Memory &MMU,
+Cookieboy::CPU::CPU(const bool &_CGB,
+					bool &_CGBDoubleSpeed,
+					Cookieboy::Memory &MMU,
 					Cookieboy::GPU &GPU,
 					Cookieboy::DividerTimer &DIV,
 					Cookieboy::TIMATimer &TIMA,
@@ -311,6 +313,8 @@ Cookieboy::CPU::CPU(Cookieboy::Memory &MMU,
 					Cookieboy::Sound &sound,
 					Cookieboy::SerialIO &serial,
 					Cookieboy::Interrupts &INT):
+CGB(_CGB),
+CGBDoubleSpeed(_CGBDoubleSpeed),
 MMU(MMU),
 GPU(GPU),
 DIV(DIV),
@@ -325,13 +329,21 @@ INT(INT)
 
 void Cookieboy::CPU::Reset()
 {
-	A = 0;
+	if (CGB)
+	{
+		A = 0x11;
+		PC = 0x100;
+	}
+	else
+	{
+		A = 0;
+		PC = 0;
+	}
 	F = 0;
 	BC.word = 0;
 	DE.word = 0;
 	HL.word = 0;
 	SP = 0xFFFE;
-	PC = 0;
 	IME = 0;
 	Halted = false;
 	HaltBug = false;
@@ -343,7 +355,14 @@ void Cookieboy::CPU::EmulateBIOS()
 {
 	Reset();
 
-	A = 0x01;
+	if (CGB)
+	{
+		A = 0x11;
+	}
+	else
+	{
+		A = 0x01;
+	}
 	F = 0xB0;
 	BC.word = 0x0013;
 	DE.word = 0x00D8;

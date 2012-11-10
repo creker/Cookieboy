@@ -2,7 +2,8 @@
 #include <SDL.h>
 #include <algorithm>
 
-Cookieboy::Sound::Sound(int sampleRate, int sampleBufferLength):
+Cookieboy::Sound::Sound(const bool &_CGB, int sampleRate, int sampleBufferLength):
+CGB(_CGB),
 SampleRate(sampleRate),
 SampleBufferLength(sampleBufferLength)
 {
@@ -12,10 +13,10 @@ SampleBufferLength(sampleBufferLength)
 
 	MasterVolume = 1;
 
-	Sound1 = new SoundUnit1(*this);
-	Sound2 = new SoundUnit2(*this);
-	Sound3 = new SoundUnit3(*this);
-	Sound4 = new SoundUnit4(*this);
+	Sound1 = new SoundUnit1(CGB, *this);
+	Sound2 = new SoundUnit2(CGB, *this);
+	Sound3 = new SoundUnit3(CGB, *this);
+	Sound4 = new SoundUnit4(CGB, *this);
 
 	Reset();
 }

@@ -20,7 +20,7 @@ each waveform taking 8 frequency timer clocks to cycle through.
 class SoundUnit2
 {
 public:
-	SoundUnit2(Sound &soundController);
+	SoundUnit2(const bool &_CGB, Sound &soundController);
 	~SoundUnit2();
 
 	void TimerStep(DWORD clockDelta);
@@ -48,6 +48,8 @@ public:
 	void NR52Changed(BYTE value);
 
 private:
+
+	const bool &CGB;
 
 	Sound &SoundController;
 

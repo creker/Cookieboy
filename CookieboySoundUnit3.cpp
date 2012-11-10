@@ -2,7 +2,8 @@
 #include "CookieboySound.h"
 #include <memory.h>
 
-Cookieboy::SoundUnit3::SoundUnit3(Sound &soundController):
+Cookieboy::SoundUnit3::SoundUnit3(const bool &_CGB, Sound &soundController):
+CGB(_CGB),
 SoundController(soundController),
 LengthCounter(0xFF, StatusBit)
 {
@@ -100,7 +101,7 @@ BYTE Cookieboy::SoundUnit3::GetWaveRAM(BYTE pos)
 { 
 	if (StatusBit)
 	{
-		if (ClockCounter == 3)
+		if (CGB || ClockCounter == 1)
 		{
 			return WaveRAM[SampleIndex >> 1];
 		}
@@ -119,7 +120,7 @@ void Cookieboy::SoundUnit3::WaveRAMChanged(BYTE pos, BYTE value)
 { 
 	if (StatusBit)
 	{
-		if (ClockCounter == 3)
+		if (CGB || ClockCounter == 1)
 		{
 			WaveRAM[SampleIndex >> 1] = value;
 		}
@@ -149,6 +150,11 @@ void Cookieboy::SoundUnit3::NR30Changed(BYTE value, bool override)
 //Sound length
 void Cookieboy::SoundUnit3::NR31Changed(BYTE value, bool override)
 {
+	if (CGB && !SoundController.GetAllSoundEnabled() && !override)
+	{
+		return;
+	}
+
 	//While all sound off only length can be written
 	LengthCounter.NRX1Changed(value);
 }
@@ -193,9 +199,9 @@ void Cookieboy::SoundUnit3::NR34Changed(BYTE value, bool override)
 	if (value & NR30 & 0x80)
 	{
 		//Triggering while channel is enabled leads to wave pattern RAM corruption
-		if (ClockCounter == 1)
+		if (!CGB && ClockCounter == 3)
 		{
-			int waveRAMPos = SampleIndex >> 1;
+			int waveRAMPos = ((SampleIndex + 1) & 0x1F) >> 1;
 			if (waveRAMPos < 4)
 			{
 				WaveRAM[0] = WaveRAM[waveRAMPos];
@@ -205,9 +211,9 @@ void Cookieboy::SoundUnit3::NR34Changed(BYTE value, bool override)
 				memcpy(WaveRAM, WaveRAM + (waveRAMPos & 0xFC), 4); 
 			}
 		}
-
+		
 		//Mostly guesswork
-		ClockCounter = -Period - 3;
+		ClockCounter = -Period - 5;
 		SampleIndex = 1;
 
 		//If sound 3 On
@@ -222,9 +228,12 @@ void Cookieboy::SoundUnit3::NR52Changed(BYTE value)
 	if (!(value >> 7))
 	{
 		StatusBit = 0;
-
+		
 		NR30Changed(0, true);
-		//Length register is not changed
+		if (CGB)
+		{
+			NR31Changed(0, true);
+		}
 		NR32Changed(0, true);
 		NR33Changed(0, true);
 		NR34Changed(0, true);

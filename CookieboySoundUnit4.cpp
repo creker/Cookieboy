@@ -1,7 +1,8 @@
 #include "CookieboySoundUnit4.h"
 #include "CookieboySound.h"
 
-Cookieboy::SoundUnit4::SoundUnit4(Sound &soundController):
+Cookieboy::SoundUnit4::SoundUnit4(const bool &_CGB, Sound &soundController):
+CGB(_CGB),
 SoundController(soundController),
 LengthCounter(0x3F, StatusBit, 0xFF)
 {
@@ -65,11 +66,16 @@ void Cookieboy::SoundUnit4::EmulateBIOS()
 //Sound length
 void Cookieboy::SoundUnit4::NR41Changed(BYTE value, bool override)
 {
+	if (CGB && !SoundController.GetAllSoundEnabled() && !override)
+	{
+		return;
+	}
+
 	//While all sound off only length can be written
 	LengthCounter.NRX1Changed(value);
 }
 
-//initial, counter/consecutive mode, High frequency bits
+//Envelope function control
 void Cookieboy::SoundUnit4::NR42Changed(BYTE value, bool override)
 {
 	if (!SoundController.GetAllSoundEnabled() && !override)
@@ -128,6 +134,10 @@ void Cookieboy::SoundUnit4::NR52Changed(BYTE value)
 	{
 		StatusBit = 0;
 
+		if (CGB)
+		{
+			NR41Changed(0, true);
+		}
 		NR42Changed(0, true);
 		NR43Changed(0, true);
 		NR44Changed(0, true);

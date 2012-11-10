@@ -1,7 +1,8 @@
 #include "CookieboySoundUnit1.h"
 #include "CookieboySound.h"
 
-Cookieboy::SoundUnit1::SoundUnit1(Sound &soundController):
+Cookieboy::SoundUnit1::SoundUnit1(const bool &_CGB, Sound &soundController):
+CGB(_CGB),
 SoundController(soundController),
 LengthCounter(0x3F, StatusBit),
 Sweep(NR13, NR14, StatusBit, Duty)
@@ -87,6 +88,10 @@ void Cookieboy::SoundUnit1::NR10Changed(BYTE value, bool override)
 //Wave pattern duty, Sound length
 void Cookieboy::SoundUnit1::NR11Changed(BYTE value, bool override)
 {
+	if (CGB && !SoundController.GetAllSoundEnabled() && !override)
+	{
+		return;
+	}
 	if (!SoundController.GetAllSoundEnabled() && !override)
 	{
 		//While all sound off only length can be written
@@ -162,7 +167,14 @@ void Cookieboy::SoundUnit1::NR52Changed(BYTE value)
 		StatusBit = 0;
 		
 		NR10Changed(0, true);
-		NR11Changed(NR11 & LengthCounter.GetLengthMask(), true);
+		if (CGB)
+		{
+			NR11Changed(0, true);
+		}
+		else
+		{
+			NR11Changed(NR11 & LengthCounter.GetLengthMask(), true);
+		}
 		NR12Changed(0, true);
 		NR13Changed(0, true);
 		NR14Changed(0, true);

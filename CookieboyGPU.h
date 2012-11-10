@@ -3,6 +3,7 @@
 
 #include "CookieboyDefs.h"
 #include <vector>
+#include <stdio.h>
 
 namespace Cookieboy
 {
@@ -10,10 +11,11 @@ namespace Cookieboy
 class Memory;
 class Interrupts;
 
+const int VRAMBankSize = 0x2000;
+
 class GPU
 {
 public:
-
 	/*
 	LCD controller modes in the STAT register
 	*/
@@ -37,15 +39,15 @@ public:
 		LCDMODE_LYXX_OAMRAM
 	};
 
-	enum RGBPalettes
+	enum DMGPalettes
 	{
 		RGBPALETTE_BLACKWHITE = 0,
 		RGBPALETTE_REAL = 1
 	};
 
-	GPU(RGBPalettes palette = RGBPALETTE_REAL);
+	GPU(const bool &_CGB, Interrupts& INT, DMGPalettes palette = RGBPALETTE_REAL);
 
-	void Step(DWORD clockDelta, Interrupts &INT);
+	void Step(DWORD clockDelta, Memory& MMU);
 
 	void Reset();
 	void EmulateBIOS();
@@ -59,22 +61,31 @@ public:
 	BYTE ReadVRAM(WORD addr);
 	BYTE ReadOAM(BYTE addr);
 
-	void DMAChanged(BYTE value, Memory &MMC);
-	void LCDCChanged(BYTE value, Interrupts &INT);
-	void STATChanged(BYTE value, Interrupts &INT);
+	void DMAChanged(BYTE value, Memory& MMU);
+	void LCDCChanged(BYTE value);
+	void STATChanged(BYTE value);
 	void SCYChanged(BYTE value) { SCY = value; }
 	void SCXChanged(BYTE value) { SCX = value; }
 	void LYChanged(BYTE value) { LY = 0; }
-	void LYCChanged(BYTE value) { LYC = value; }
+	void LYCChanged(BYTE value);
 	void BGPChanged(BYTE value) { BGP = value; }
 	void OBP0Changed(BYTE value) { OBP0 = value; }
 	void OBP1Changed(BYTE value) { OBP1 = value; }
-	void WYChanged(BYTE value) { DelayedWY = value; }
+	void WYChanged(BYTE value) { WY = value; }
 	void WXChanged(BYTE value) { WX = value; }
+	void VBKChanged(BYTE value);
+	void HDMA1Changed(BYTE value);
+	void HDMA2Changed(BYTE value);
+	void HDMA3Changed(BYTE value);
+	void HDMA4Changed(BYTE value);
+	void HDMA5Changed(BYTE value, Memory& MMU);
+	void BGPIChanged(BYTE value) { if (CGB) { BGPI = value; } }
+	void BGPDChanged(BYTE value);
+	void OBPIChanged(BYTE value) { if (CGB) { OBPI = value; } }
+	void OBPDChanged(BYTE value);
 
 	BYTE GetLCDC() { return LCDC; }
 	BYTE GetSTAT() { return STAT | 0x80; }
-	BYTE GetSTAT() { return STAT; }
 	BYTE GetSCY() { return SCY; }
 	BYTE GetSCX() { return SCX; }
 	BYTE GetLY() { return LY; }
@@ -84,16 +95,34 @@ public:
 	BYTE GetOBP1() { return OBP1; }
 	BYTE GetWY() { return WY; }
 	BYTE GetWX() { return WX; }
+	BYTE GetVBK() { return VBK | 0xFE; }
+	BYTE GetHDMA1() { return HDMASource >> 8; }
+	BYTE GetHDMA2() { return HDMASource & 0xFF; }
+	BYTE GetHDMA3() { return HDMADestination >> 8; }
+	BYTE GetHDMA4() { return HDMADestination & 0xFF; }
+	BYTE GetHDMA5() { return HDMAControl; }
+	BYTE GetBGPI() { return BGPI | 0x40; }
+	BYTE GetBGPD() { return BGPD[BGPI & 0x3F]; }
+	BYTE GetOBPI() { return OBPI | 0x40; }
+	BYTE GetOBPD() { return OBPD[OBPI & 0x3F]; }
 
 private:
-	//GPU memory
-	BYTE VRAM[0x2000];
-	BYTE OAM[0xA0 + 0x5F];
 
 	//GPU Microcode
 	void RenderScanline();
 	void CheckLYC(Interrupts &INT);
 	void PrepareSpriteQueue();
+	bool HDMACopyBlock(WORD source, WORD dest, Memory &MMU);
+	DWORD GBCColorToARGB(WORD color);
+
+	const bool &CGB;
+
+	Interrupts& INT;
+
+	//GPU memory
+	BYTE VRAM[VRAMBankSize * 2];
+	BYTE OAM[0xA0 + 0x5F];
+	WORD VRAMBankOffset;
 
 	//GPU I/O ports
 	BYTE LCDC;	//LCD Control (R/W)
@@ -173,7 +202,35 @@ private:
 				//0 <= WX <= 166
 				//WX must be greater than or equal to 0 and must be less than or equal to 166 for window to be visible
 
+	bool hdmaActive;
+	WORD HDMASource;
+	WORD HDMADestination;
+	BYTE HDMAControl;//New DMA Length/Mode/Start
+
+	BYTE VBK;	//Current Video Memory (VRAM) Bank
+				//Bit 0 - VRAM Bank (0-1)
+
+	BYTE BGPI;	//Background Palette Index
+				//Bit 0-5   Index (00-3F)
+				//Bit 7     Auto Increment  (0=Disabled, 1=Increment after Writing)
+
+	BYTE BGPD[8 * 8];	//Background Palette Data
+						//Bit 0-4   Red Intensity   (00-1F)
+						//Bit 5-9   Green Intensity (00-1F)
+						//Bit 10-14 Blue Intensity  (00-1F)
+
+
+	BYTE OBPI;	//Sprite Palette Index
+				//Bit 0-5   Index (00-3F)
+				//Bit 7     Auto Increment  (0=Disabled, 1=Increment after Writing)
+
+	BYTE OBPD[8 * 8];	//Sprite Palette Data
+						//Bit 0-4   Red Intensity   (00-1F)
+						//Bit 5-9   Green Intensity (00-1F)
+						//Bit 10-14 Blue Intensity  (00-1F)
+
 	DWORD GB2RGBPalette[4];			//Gameboy palette -> ARGB color
+	DWORD GBC2RGBPalette[32768];	//GBG color -> ARGB color
 	DWORD SpriteClocks[11];			//Sprites rendering affects LCD timings
 	bool NewFrameReady;				//Indicates that new frame rendered
 	DWORD Framebuffer[144][160];	//Holds actual pixel colors of the last frame

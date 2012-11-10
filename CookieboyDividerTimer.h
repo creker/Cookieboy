@@ -12,13 +12,19 @@ Very simple timer. Clocked at 16384 Hz. Doesn't generate any interrupts. Loops f
 class DividerTimer
 {
 public:
-	DividerTimer()
+	DividerTimer(const bool &_CGB, const bool &_CGBDoubleSpeed) : CGB(_CGB), CGBDoubleSpeed(_CGBDoubleSpeed)
 	{
 		Reset();
 	}
 	
 	void Step(DWORD clockDelta)
 	{
+		//In double speed mode DIV operates twice as fast
+		if (CGB && CGBDoubleSpeed)
+		{
+			clockDelta *= 2;
+		}
+
 		ClockCounter += clockDelta;
 
 		//Divider increments every 256 ticks
@@ -53,6 +59,9 @@ public:
 	}
 	
 private:
+	const bool &CGB;
+	const bool &CGBDoubleSpeed;
+
 	DWORD ClockCounter;
 	
 	BYTE DIV;	//Divider Register (R/W)

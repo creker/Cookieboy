@@ -15,10 +15,16 @@ Counter (TIMA). When it overflows, it generates an interrupt. It is then loaded 
 class TIMATimer
 {
 public:
-	TIMATimer() { Reset(); }
+	TIMATimer(const bool &_CGB, const bool &_CGBDoubleSpeed) : CGB(_CGB), CGBDoubleSpeed(_CGBDoubleSpeed) { Reset(); }
 
 	void Step(DWORD clockDelta, Interrupts &INT)
 	{
+		//In double speed mode TIMA operates twice as fast
+		if (CGB && CGBDoubleSpeed)
+		{
+			clockDelta *= 2;
+		}
+
 		//TIMA enabled
 		if (TAC & 0x4)
 		{
@@ -89,6 +95,9 @@ public:
 	BYTE GetTAC() { return TAC | 0xF8; }
 
 private:
+	const bool &CGB;
+	const bool &CGBDoubleSpeed;
+
 	DWORD ClockCounter;
 	DWORD Period;
 

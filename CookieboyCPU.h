@@ -45,7 +45,7 @@ public:
 		WORD word;
 	};
 
-	CPU(Memory &MMU, GPU &GPU, DividerTimer &DIV, TIMATimer &TIMA, Joypad &joypad, Sound &sound, SerialIO &serial, Interrupts &INT);
+	CPU(const bool &CGB, bool &_CGBDoubleSpeed, Memory &MMU, GPU &GPU, DividerTimer &DIV, TIMATimer &TIMA, Joypad &joypad, Sound &sound, SerialIO &serial, Interrupts &INT);
 
 	void Step();
 
@@ -68,6 +68,9 @@ private:
 	void StackPushWord(WORD value);
 	BYTE StackPopByte();
 	WORD StackPopWord();
+
+	const bool &CGB;
+	bool &CGBDoubleSpeed;
 
 	//CPU registers
 	BYTE A;

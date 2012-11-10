@@ -18,7 +18,7 @@ The wave channel's frequency timer period is set to (2048-frequency)*2
 class SoundUnit3
 {
 public:
-	SoundUnit3(Sound &soundController);
+	SoundUnit3(const bool &_CGB, Sound &soundController);
 	~SoundUnit3();
 
 	void TimerStep(DWORD clockDelta);
@@ -52,6 +52,8 @@ public:
 private:
 
 	void CalculatePeriod() { Period = (2048 - (((NR34 & 0x7) << 8) | NR33)) * 2; }
+
+	const bool &CGB;
 
 	Sound &SoundController;
 

@@ -1,17 +1,27 @@
 #include "CookieboyEmulator.h"
+#include "CookieboyCPU.h"
+#include "CookieboyInterrupts.h"
+#include "CookieboyMemory.h"
+#include "CookieboyDividerTimer.h"
+#include "CookieboyTIMATimer.h"
+#include "CookieboySerialIO.h"
+#include "CookieboySound.h"
+#include "CookieboyROMInfo.h"
 
-Cookieboy::Emulator::Emulator(GPU::RGBPalettes palette, int soundSampleRate, int soundSampleBufferLength)
+Cookieboy::Emulator::Emulator(GPU::DMGPalettes palette, int soundSampleRate, int soundSampleBufferLength) :
+CGB(false),
+CGBDoubleSpeed(false)
 {
 	INT = new Interrupts();
-	Gpu = new GPU(palette);
-	TIMA = new TIMATimer();
-	DIV = new DividerTimer();
+	Gpu = new GPU(CGB, *INT, palette);
+	TIMA = new TIMATimer(CGB, CGBDoubleSpeed);
+	DIV = new DividerTimer(CGB, CGBDoubleSpeed);
 	Input = new Joypad();
-	Serial = new SerialIO();
-	SPU = new Sound(soundSampleRate, soundSampleBufferLength);
+	Serial = new SerialIO(CGB, CGBDoubleSpeed);
+	SPU = new Sound(CGB, soundSampleRate, soundSampleBufferLength);
 
-	MMU = new Memory(*Gpu, *DIV, *TIMA, *Input, *SPU, *Serial, *INT);
-	Cpu = new CPU(*MMU, *Gpu, *DIV, *TIMA, *Input, *SPU, *Serial, *INT);
+	MMU = new Memory(CGB, CGBDoubleSpeed, *Gpu, *DIV, *TIMA, *Input, *SPU, *Serial, *INT);
+	Cpu = new CPU(CGB, CGBDoubleSpeed, *MMU, *Gpu, *DIV, *TIMA, *Input, *SPU, *Serial, *INT);
 }
 
 Cookieboy::Emulator::~Emulator()
@@ -27,9 +37,24 @@ Cookieboy::Emulator::~Emulator()
 	delete Input;
 }
 
+const Cookieboy::ROMInfo* Cookieboy::Emulator::LoadROM(const char *ROMPath) 
+{
+	CGB = false;
+	CGBDoubleSpeed = false;
+
+	const ROMInfo *info = MMU->LoadROM(ROMPath);
+	
+	return info;
+}
+
 void Cookieboy::Emulator::Step()
 {
 	Cpu->Step();
+}
+
+void Cookieboy::Emulator::UpdateJoypad(Joypad::ButtonsState &state) 
+{ 
+	Input->UpdateJoypad(state); 
 }
 
 void Cookieboy::Emulator::Reset()
@@ -63,4 +88,34 @@ void Cookieboy::Emulator::UseBIOS(bool BIOS)
 		SPU->EmulateBIOS();
 		INT->EmulateBIOS();
 	}
+}
+
+const DWORD** Cookieboy::Emulator::GPUFramebuffer() 
+{ 
+	return Gpu->GetFramebuffer();
+}
+
+bool Cookieboy::Emulator::IsNewGPUFrameReady()
+{
+	return Gpu->IsNewFrameReady(); 
+}
+
+void Cookieboy::Emulator::WaitForNewGPUFrame()
+{ 
+	Gpu->WaitForNewFrame();
+}
+
+const short* Cookieboy::Emulator::SoundFrameBuffer() 
+{ 
+	return SPU->GetSoundFramebuffer();
+}
+
+bool Cookieboy::Emulator::IsNewSoundFrameReady()
+{ 
+	return SPU->IsNewFrameReady(); 
+}
+
+void Cookieboy::Emulator::WaitForNewSoundFrame() 
+{ 
+	return SPU->WaitForNewFrame(); 
 }

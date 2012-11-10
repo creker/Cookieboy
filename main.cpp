@@ -2,6 +2,7 @@
 #include <Windows.h>
 #include <SDL.h>
 #include "CookieboyEmulator.h"
+#include "CookieboyROMInfo.h"
 #include <io.h>
 #include <Fcntl.h>
 #include "render.h"
@@ -12,6 +13,7 @@ bool FullSpeed = false;
 HWND hWnd;
 IDirect3DTexture9 *backbuffer;
 Cookieboy::Joypad::ButtonsState Joypad;
+Cookieboy::Emulator *emulator = NULL;
 
 LRESULT CALLBACK WindowProcedure(HWND hWnd, UINT uMessage, WPARAM wParam, LPARAM lParam)
 {
@@ -149,10 +151,8 @@ int WINAPI CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR 
 	backbuffer = CreateBackbuffer(160, 144);
 	
 	AudioQueue audioQueue = AudioQueue(44100, 1024, 5);
-	Cookieboy::Emulator emulator = Cookieboy::Emulator(Cookieboy::GPU::RGBPALETTE_REAL, 44100, 1024);
-	emulator.Reset();
-	emulator.UseBIOS(false);
-
+	emulator = new Cookieboy::Emulator(Cookieboy::GPU::RGBPALETTE_REAL, 44100, 1024);
+	
 	OPENFILENAME ofn;
 	char szFile[1024] = {0};
 	
@@ -173,7 +173,8 @@ int WINAPI CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR 
 		return 0;
 	}
 	
-	const Cookieboy::ROMInfo *ROM = emulator.LoadROM(ofn.lpstrFile);
+	const Cookieboy::ROMInfo *ROM = emulator->LoadROM(ofn.lpstrFile);
+	emulator->UseBIOS(false);
 
 	if (ROM == NULL)
 	{
@@ -202,29 +203,30 @@ int WINAPI CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR 
 			DispatchMessage(&msg);
 		}
 
-		emulator.UpdateJoypad(Joypad);
+		emulator->UpdateJoypad(Joypad);
 		do
 		{
 			do
 			{
-				emulator.Step();
-			}while (!emulator.IsNewSoundFrameReady());
-			emulator.WaitForNewSoundFrame();
+				emulator->Step();
+			}while (!emulator->IsNewSoundFrameReady());
+			emulator->WaitForNewSoundFrame();
 
-			audioQueue.Append(emulator.SoundFrameBuffer(), 1024, !FullSpeed);
+			audioQueue.Append(emulator->SoundFrameBuffer(), 1024, !FullSpeed);
 
-		}while (!emulator.IsNewGPUFrameReady());
-		emulator.WaitForNewGPUFrame();
+		}while (!emulator->IsNewGPUFrameReady());
+		emulator->WaitForNewGPUFrame();
 
 		void *pixels = TextureLock(backbuffer);
 
-		memcpy(pixels, emulator.GPUFramebuffer(), sizeof(DWORD) * 160 * 144);
+		memcpy(pixels, emulator->GPUFramebuffer(), sizeof(DWORD) * 160 * 144);
 
 		TextureUnlock(backbuffer);
 
 		Render(backbuffer);
 	}
 
+	delete emulator;
 	backbuffer->Release();
 	CloseD3D();
 

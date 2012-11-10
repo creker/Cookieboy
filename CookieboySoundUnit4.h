@@ -25,7 +25,7 @@ LFSR has period of 2^n - 1 where n is LFSR register length in bits. LFSR produce
 class SoundUnit4
 {
 public:
-	SoundUnit4(Sound &soundController);
+	SoundUnit4(const bool &_CGB, Sound &soundController);
 	~SoundUnit4();
 
 	void TimerStep(DWORD clockDelta);
@@ -53,6 +53,8 @@ public:
 	void NR52Changed(BYTE value);
 
 private:
+	
+	const bool &CGB;
 
 	Sound &SoundController;
 

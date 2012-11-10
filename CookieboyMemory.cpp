@@ -37,13 +37,17 @@ BYTE Cookieboy::Memory::NintendoGraphic[48] = { 0xCE, 0xED, 0x66, 0x66, 0xCC, 0x
 												0x00, 0x08, 0x11, 0x1F, 0x88, 0x89, 0x00, 0x0E, 0xDC, 0xCC, 0x6E, 0xE6, 0xDD, 0xDD, 0xD9, 0x99,
 												0xBB, 0xBB, 0x67, 0x63, 0x6E, 0x0E, 0xEC, 0xCC, 0xDD, 0xDC, 0x99, 0x9F, 0xBB, 0xB9, 0x33, 0x3E};
 
-Cookieboy::Memory::Memory(Cookieboy::GPU &GPU, 
+Cookieboy::Memory::Memory(bool &_CGB,
+						  bool &_CGBDoubleSpeed,
+						  Cookieboy::GPU &GPU, 
 						  Cookieboy::DividerTimer &DIV,
 						  Cookieboy::TIMATimer &TIMA,
 						  Cookieboy::Joypad &joypad, 
 						  Cookieboy::Sound &sound,
 						  Cookieboy::SerialIO &serial, 
 						  Cookieboy::Interrupts &INT):
+CGB(_CGB),
+CGBDoubleSpeed(_CGBDoubleSpeed),
 GPU(GPU),
 DIV(DIV),
 TIMA(TIMA),
@@ -54,7 +58,9 @@ INT(INT),
 InBIOS(true),
 MBC(NULL),
 RAMBanks(NULL),
-ROM(NULL)
+ROM(NULL),
+ROMLoaded(false),
+WRAMOffset(WRAMBankSize)
 {
 	Reset();
 }
@@ -77,7 +83,7 @@ Cookieboy::Memory::~Memory()
 	}
 }
 
-const Cookieboy::ROMInfo* Cookieboy::Memory::LoadROM(const char* ROMPath)
+const Cookieboy::ROMInfo* Cookieboy::Memory::LoadROM(const char* ROMPath, EmulationModes mode)
 {
 	FILE* file = NULL;
 	fopen_s(&file, ROMPath, "rb");
@@ -190,6 +196,42 @@ const Cookieboy::ROMInfo* Cookieboy::Memory::LoadROM(const char* ROMPath)
 		return NULL;
 	}
 
+	switch (mode)
+	{
+	case EMULMODE_FORCEDMG:
+		CGB = false;
+		CGBDoubleSpeed = false;
+		break;
+
+	case EMULMODE_FORCECGB:
+		CGB = true;
+		CGBDoubleSpeed = false;
+		break;
+
+	case EMULMODE_AUTO:
+		switch (ROM[0x143])
+		{
+		case 0x80://Support CGB and DMG
+			CGB = true;
+			CGBDoubleSpeed = false;
+			break;
+
+		case 0xC0://CGB only
+			CGB = true;
+			CGBDoubleSpeed = false;
+			break;
+			
+		default://DMG only
+			CGB = false;
+			CGBDoubleSpeed = false;
+			break;
+		}
+		break;
+
+	default:
+		break;
+	}
+
 	ROMLoaded = true;
 
 	//Restoring RAM contents if there is battery
@@ -218,17 +260,24 @@ void Cookieboy::Memory::Reset()
 	MBC = NULL;
 
 	ROMLoaded = false;
+	WRAMOffset = WRAMBankSize;
 
 	//On power ON gameboy internal RAM is filled with random values
 	srand(clock());
-	for (int i = 0; i < 0x2000; i++)
+	for (int i = 0; i < WRAMBankSize * 8; i++)
 	{
-		InternalRAM1[i] = rand() % 0x100;
+		WRAM[i] = rand() % 0x100;
 	}
 	for (int i = 0; i < 0x7F; i++)
 	{
-		InternalRAM2[i] = rand() % 0x100;
+		HRAM[i] = rand() % 0x100;
 	}
+
+	HIDDEN1 = 0xFE;
+	HIDDEN2 = 0x00;
+	HIDDEN3 = 0x00;
+	HIDDEN4 = 0x00;
+	HIDDEN5 = 0x8F;
 }
 
 void Cookieboy::Memory::EmulateBIOS()
@@ -265,21 +314,25 @@ void Cookieboy::Memory::Write(WORD addr, BYTE value)
 		GPU.WriteVRAM(addr - 0x8000, value);
 		break;
 
-	//Internal RAM
+	//Work RAM bank 0
 	case 0xC000:
-	case 0xD000:
-		InternalRAM1[addr - 0xC000] = value;
+		WRAM[addr - 0xC000] = value;
 		break;
 
-	//Internal RAM echo
+	//Switchable work RAM bank
+	case 0xD000:
+		WRAM[WRAMOffset + (addr - 0xD000)] = value;
+		break;
+
+	//Work RAM bank 0 echo
 	case 0xE000:
-		InternalRAM1[addr - 0xE000] = value;
+		WRAM[addr - 0xE000] = value;
 		break;
 
 	case 0xF000:
 		switch (addr & 0xF00)
 		{
-		//Internal RAM echo
+		//Switchable Work RAM bank echo
 		case 0x000:
 		case 0x100:
 		case 0x200:
@@ -294,7 +347,7 @@ void Cookieboy::Memory::Write(WORD addr, BYTE value)
 		case 0xB00:
 		case 0xC00:
 		case 0xD00:
-			InternalRAM1[addr - 0xE000] = value;
+			WRAM[WRAMOffset + (addr - 0xF000)] = value;
 			break;
 
 		//Sprite attrib memory
@@ -446,11 +499,11 @@ void Cookieboy::Memory::Write(WORD addr, BYTE value)
 				break;
 
 			case IOPORT_LCDC:
-				GPU.LCDCChanged(value, INT);
+				GPU.LCDCChanged(value);
 				break;
 
 			case IOPORT_STAT:
-				GPU.STATChanged(value, INT);
+				GPU.STATChanged(value);
 				break;
 
 			case IOPORT_SCY:
@@ -493,20 +546,98 @@ void Cookieboy::Memory::Write(WORD addr, BYTE value)
 				GPU.WXChanged(value);
 				break;
 
+			case IOPORT_KEY1:
+				{
+					int a = 0;
+				}
+				break;
+				
+			case IOPORT_VBK:
+				GPU.VBKChanged(value);
+				break;
+
+			case IOPORT_HDMA1:
+				GPU.HDMA1Changed(value);
+				break;
+
+			case IOPORT_HDMA2:
+				GPU.HDMA2Changed(value);
+				break;
+
+			case IOPORT_HDMA3:
+				GPU.HDMA3Changed(value);
+				break;
+
+			case IOPORT_HDMA4:
+				GPU.HDMA4Changed(value);
+				break;
+
+			case IOPORT_HDMA5:
+				GPU.HDMA5Changed(value, *this);
+				break;
+
+			case IOPORT_BGPI:
+				GPU.BGPIChanged(value);
+				break;
+
+			case IOPORT_BGPD:
+				GPU.BGPDChanged(value);
+				break;
+
+			case IOPORT_OBPI:
+				GPU.OBPIChanged(value);
+				break;
+
+			case IOPORT_OBPD:
+				GPU.OBPDChanged(value);
+				break;
+
 			case 0x50:
 				//Writing to 0xFF50 disables BIOS
 				//This is done by last instruction in bootstrap ROM
 				InBIOS = false;
 				break;
 
+			case IOPORT_SVBK:
+				WRAMOffset = (value & 0x7) * WRAMBankSize;
+				if (WRAMOffset == 0)
+				{
+					WRAMOffset = WRAMBankSize;
+				}
+				break;
+
 			case 0xFF:
 				INT.IEChanged(value);
+				break;
+
+			//Undocumented registers
+			case 0x6C:
+				if (CGB)
+				{
+					HIDDEN1 = value;
+				}
+				break;
+
+			case 0x72:
+				HIDDEN2 = value;
+				break;
+
+			case 0x73:
+				HIDDEN3 = value;
+				break;
+				
+			case 0x74:
+				HIDDEN4 = value;
+				break;
+
+			case 0x75:
+				HIDDEN5 = value;
 				break;
 
 			default:
 				if (addr >= 0xFF80 && addr <= 0xFFFE)//Internal RAM
 				{
-					InternalRAM2[addr - 0xFF80] = value;
+					HRAM[addr - 0xFF80] = value;
 				}
 				break;
 			}
@@ -546,19 +677,22 @@ BYTE Cookieboy::Memory::Read(WORD addr)
 	case 0x9000:
 		return GPU.ReadVRAM(addr - 0x8000);
 
-	//Internal RAM
+	//Work RAM bank 0
 	case 0xC000:
-	case 0xD000:
-		return InternalRAM1[addr - 0xC000];
+		return WRAM[addr - 0xC000];
 
-	//Internal RAM echo
+	//Switchable Work RAM bank
+	case 0xD000:
+		return WRAM[WRAMOffset + (addr - 0xD000)];
+
+	//Work RAM bank 0 echo
 	case 0xE000:
-		return InternalRAM1[addr - 0xE000];
+		return WRAM[addr - 0xE000];
 
 	case 0xF000:
 		switch (addr & 0xF00)
 		{
-		//Internal RAM echo
+		//Switchable Work RAM bank echo
 		case 0x000:
 		case 0x100:
 		case 0x200:
@@ -573,7 +707,7 @@ BYTE Cookieboy::Memory::Read(WORD addr)
 		case 0xB00:
 		case 0xC00:
 		case 0xD00:
-			return InternalRAM1[addr - 0xE000];
+			return WRAM[WRAMOffset + (addr - 0xF000)];
 
 		//Sprite attrib memory
 		case 0xE00:
@@ -720,13 +854,85 @@ BYTE Cookieboy::Memory::Read(WORD addr)
 			case IOPORT_WX:
 				return GPU.GetWX();
 
+			case IOPORT_KEY1:
+				return 0xFF;
+
+			case IOPORT_VBK:
+				return GPU.GetVBK();
+
+			case IOPORT_HDMA1:
+				return GPU.GetHDMA1();
+			
+			case IOPORT_HDMA2:
+				return GPU.GetHDMA2();
+
+			case IOPORT_HDMA3:
+				return GPU.GetHDMA3();
+
+			case IOPORT_HDMA4:
+				return GPU.GetHDMA4();
+
+			case IOPORT_HDMA5:
+				return GPU.GetHDMA5();
+
+			case IOPORT_BGPI:
+				return GPU.GetBGPI();
+
+			case IOPORT_BGPD:
+				return GPU.GetBGPD();
+
+			case IOPORT_OBPI:
+				return GPU.GetOBPI();
+
+			case IOPORT_OBPD:
+				return GPU.GetOBPD();
+
+			case IOPORT_SVBK:
+				return 0xF8 | ((WRAMOffset / WRAMBankSize) & 0x7);
+
 			case 0xFF:
 				return INT.GetIE();
+
+			//Undocumented registers
+			case 0x6C:
+				if (CGB)
+				{
+					return 0xFE | HIDDEN1;
+				}
+				else
+				{
+					return 0xFF;
+				}
+
+			case 0x72:
+				return HIDDEN2;
+
+			case 0x73:
+				return HIDDEN3;
+				
+			case 0x74:
+				if (CGB)
+				{
+					return HIDDEN4;
+				}
+				else
+				{
+					return 0xFF;
+				}
+
+			case 0x75:
+				return 0x70 | HIDDEN5;
+
+			case 0x76:
+				return 0x00;
+
+			case 0x77:
+				return 0x00;
 
 			default:
 				if (addr >= 0xFF80 && addr <= 0xFFFE)//Internal RAM
 				{
-					return InternalRAM2[addr - 0xFF80];
+					return HRAM[addr - 0xFF80];
 				}
 				else 
 				{

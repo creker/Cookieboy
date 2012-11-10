@@ -9,7 +9,9 @@
 #define SET_LCD_MODE(value) {STAT &= 0xFC; STAT |= (value);}
 #define GET_TILE_PIXEL(VRAMAddr, x, y) ((((VRAM[(VRAMAddr) + (y) * 2 + 1] >> (7 - (x))) & 0x1) << 1) | ((VRAM[(VRAMAddr) + (y) * 2] >> (7 - (x))) & 0x1))
 
-Cookieboy::GPU::GPU(RGBPalettes palette)
+Cookieboy::GPU::GPU(const bool &_CGB, Interrupts& INT, DMGPalettes palette) :
+INT(INT),
+CGB(_CGB)
 {
 	Reset();
 
@@ -43,9 +45,17 @@ Cookieboy::GPU::GPU(RGBPalettes palette)
 
 	SpriteQueue = std::vector<DWORD>();
 	SpriteQueue.reserve(40);
+
+	for (int i = 0; i < 32768; i++)
+	{
+		BYTE r = (i & 0x1F) << 3;
+		BYTE g = ((i >> 5) & 0x1F) << 3;
+		BYTE b = ((i >> 10) & 0x1F) << 3;
+		GBC2RGBPalette[i] = 0xFF000000 | (r << 16) | (g << 8) | b;
+	}
 }
 
-void Cookieboy::GPU::Step(DWORD clockDelta, Interrupts &INT)
+void Cookieboy::GPU::Step(DWORD clockDelta, Memory& MMU)
 {
 	ClockCounter += clockDelta;
 	
@@ -101,7 +111,22 @@ void Cookieboy::GPU::Step(DWORD clockDelta, Interrupts &INT)
 				INT.Request(Interrupts::INTERRUPT_LCDC);
 				LCDCInterrupted = true;
 			}
-			
+
+			//HDMA block copy
+			if (CGB && hdmaActive)
+			{
+				HDMACopyBlock(HDMASource, VRAMBankOffset + HDMADestination, MMU);
+				HDMAControl--;
+				HDMADestination += 0x10;
+				HDMASource += 0x10;
+
+				if ((HDMAControl & 0x7F) == 0x7F)
+				{
+					HDMAControl = 0xFF;
+					hdmaActive = false;
+				}
+			}
+
 			LCDMode = LCDMODE_LYXX_HBLANK_INC;
 			ClocksToNextState = 200 - ScrollXClocks - SpriteClocks[SpriteQueue.size()];
 			break;
@@ -158,7 +183,6 @@ void Cookieboy::GPU::Step(DWORD clockDelta, Interrupts &INT)
 			}
 			else
 			{
-				
 				LCDMode = LCDMODE_LY9X_VBLANK;
 			}
 
@@ -201,13 +225,16 @@ void Cookieboy::GPU::Step(DWORD clockDelta, Interrupts &INT)
 
 void Cookieboy::GPU::Reset()
 {
-	memset(VRAM, 0x0, 0x2000);
+	memset(VRAM, 0x0, VRAMBankSize * 2);
 	memset(OAM, 0x0, 0xFF);
 	for (int i = 0; i < 144; i++)
 	{
 		memset(Framebuffer[i], 0xFF, sizeof(Framebuffer[0][0]) * 160);
 		memset(Backbuffer[i], 0, sizeof(Backbuffer[0][0]) * 160);
 	}
+
+	// Initially all background colors are initialized as white
+	memset(BGPD, 0xFF, 64);
 
 	LCDC = 0x0;
 	STAT = 0x0;
@@ -220,7 +247,7 @@ void Cookieboy::GPU::Reset()
 	WX = 0x0;
 	SpriteQueue.clear();
 	NewFrameReady = false;
-	ClockCounter = 0x0;
+	ClockCounter = 0;
 	ClocksToNextState = 0x0;
 	ScrollXClocks = 0x0;
 	LCDCInterrupted = false;
@@ -229,6 +256,14 @@ void Cookieboy::GPU::Reset()
 	LCDMode = LCDMODE_LYXX_OAM;
 	DelayedWY = -1;
 	WindowLine = 0;
+	VRAMBankOffset = 0;
+	hdmaActive = false;
+	HDMASource = 0;
+	HDMADestination = 0;
+	HDMAControl = 0;
+	VBK = 0;
+	BGPI = 0;
+	OBPI = 0;
 }
 
 void Cookieboy::GPU::EmulateBIOS()
@@ -244,16 +279,56 @@ void Cookieboy::GPU::EmulateBIOS()
 	WX = 0x0;
 }
 
-void Cookieboy::GPU::DMAChanged(BYTE value, Memory &MMC)
+void Cookieboy::GPU::WriteVRAM(WORD addr, BYTE value)
+{
+	if (GET_LCD_MODE() != GBLCDMODE_OAMRAM || !LCD_ON())
+	{
+		VRAM[VRAMBankOffset + addr] = value;
+	}
+}
+
+void Cookieboy::GPU::WriteOAM(BYTE addr, BYTE value)
+{
+	if (GET_LCD_MODE() == GBLCDMODE_HBLANK || GET_LCD_MODE() == GBLCDMODE_VBLANK || !LCD_ON())
+	{
+		OAM[addr] = value;
+	}
+}
+
+BYTE Cookieboy::GPU::ReadVRAM(WORD addr)
+{
+	if (GET_LCD_MODE() != GBLCDMODE_OAMRAM || !LCD_ON())
+	{
+		return VRAM[VRAMBankOffset + addr];
+	}
+	else
+	{
+		return 0xFF;
+	}
+}
+
+BYTE Cookieboy::GPU::ReadOAM(BYTE addr) 
+{
+	if (GET_LCD_MODE() == GBLCDMODE_HBLANK || GET_LCD_MODE() == GBLCDMODE_VBLANK || !LCD_ON())
+	{
+		return OAM[addr];
+	}
+	else
+	{
+		return 0xFF;
+	}
+}
+
+void Cookieboy::GPU::DMAChanged(BYTE value, Memory& MMU)
 {
 	//Transferring data to OAM
 	for (int i = 0; i < 0xA0; i++)
 	{
-		OAM[i] = MMC.Read((value << 8) | i);
+		OAM[i] = MMU.Read((value << 8) | i);
 	}
 }
 
-void Cookieboy::GPU::LCDCChanged(BYTE value, Interrupts &INT)
+void Cookieboy::GPU::LCDCChanged(BYTE value)
 {
 	//If LCD is being turned off
 	if (!(value & 0x80))
@@ -287,15 +362,177 @@ void Cookieboy::GPU::LCDCChanged(BYTE value, Interrupts &INT)
 	LCDC = value;
 }
 
+void Cookieboy::GPU::STATChanged(BYTE value)
+{
+	//Coincidence flag and mode flag are read-only
+	STAT = (STAT & 0x7) | (value & 0x78); 
+
+	//STAT bug
+	if (LCD_ON() && 
+		(GET_LCD_MODE() == GBLCDMODE_HBLANK || GET_LCD_MODE() == GBLCDMODE_VBLANK))
+	{
+		INT.Request(Interrupts::INTERRUPT_LCDC); 
+	}
+}
+
+void Cookieboy::GPU::LYCChanged(BYTE value) 
+{ 
+	if (LYC != value)
+	{
+		LYC = value;
+		if (LCDMode != LCDMODE_LYXX_HBLANK_INC && LCDMode != LCDMODE_LY9X_VBLANK_INC)
+		{
+			CheckLYC(INT);
+		}
+	}
+	else
+	{
+		LYC = value;
+	}
+}
+
+void Cookieboy::GPU::VBKChanged(BYTE value)
+{ 
+	if (CGB)
+	{
+		VBK = value; 
+		VRAMBankOffset = VRAMBankSize * (VBK & 0x1);
+	}
+	else
+	{
+		VRAMBankOffset = 0;
+	}
+}
+
+void Cookieboy::GPU::HDMA1Changed(BYTE value) 
+{ 
+	if (!CGB) 
+	{ 
+		return;
+	}
+
+	HDMASource = (value << 8) | (HDMASource & 0xFF);
+}
+
+void Cookieboy::GPU::HDMA2Changed(BYTE value) 
+{ 
+	if (!CGB)
+	{
+		return;
+	}
+	
+	HDMASource = (HDMASource & 0xFF00) | (value & 0xF0);
+}
+
+void Cookieboy::GPU::HDMA3Changed(BYTE value)
+{
+	if (!CGB)
+	{
+		return;
+	}
+
+	HDMADestination = ((value & 0x1F) << 8) | (HDMADestination & 0xF0);
+}
+
+void Cookieboy::GPU::HDMA4Changed(BYTE value)
+{
+	if (!CGB)
+	{
+		return;
+	}
+
+	HDMADestination = (HDMADestination & 0xFF00) | (value & 0xF0);
+}
+
+void Cookieboy::GPU::HDMA5Changed(BYTE value, Memory& MMU)
+{
+	if (!CGB)
+	{
+		return;
+	}
+
+	HDMAControl = value & 0x7F;
+
+	if (hdmaActive)
+	{
+		if (!(value & 0x80))
+		{
+			hdmaActive = false;
+			HDMAControl |= 0x80;
+		}
+	}
+	else
+	{
+		if (value & 0x80)//H-Blank DMA
+		{
+			hdmaActive = true;
+		}
+		else//General purpose DMA
+		{
+			hdmaActive = false;
+
+			WORD sourceAddr = HDMASource;
+			WORD destAddr = VRAMBankOffset + HDMADestination;
+			for (; (HDMAControl & 0x7F) != 0x7F; HDMAControl--, destAddr += 0x10, sourceAddr += 0x10)
+			{
+				if (HDMACopyBlock(sourceAddr, destAddr, MMU))
+				{
+					break;
+				}
+			}
+
+			HDMASource = sourceAddr;
+			HDMADestination = destAddr - VRAMBankOffset;
+			HDMAControl = 0xFF;
+		}
+	}
+}
+
+void Cookieboy::GPU::BGPDChanged(BYTE value) 
+{
+	if (!CGB)
+	{
+		return;
+	}
+
+	BYTE index = BGPI & 0x3F;
+
+	BGPD[index] = value;
+
+	if (BGPI & 0x80)
+	{
+		index++;
+		BGPI = (BGPI & 0xC0) | (index & 0x3F);
+	}
+}
+
+void Cookieboy::GPU::OBPDChanged(BYTE value) 
+{
+	if (!CGB)
+	{
+		return;
+	}
+
+	BYTE index = OBPI & 0x3F;
+
+	OBPD[index] = value;
+
+	if (OBPI & 0x80)
+	{
+		index++;
+		OBPI = (OBPI & 0xC0) | (index & 0x3F);
+	}
+}
+
 void Cookieboy::GPU::RenderScanline()
 {
 	#pragma region background
-	if (LCDC & 0x01)//Background display
+	if ((LCDC & 0x01) || CGB)//Background display
 	{
-		WORD tileMap = (LCDC & 0x8) ? 0x1C00 : 0x1800;
-		WORD tileData = (LCDC & 0x10) ? 0x0 : 0x800;
+		WORD tileMapAddr = (LCDC & 0x8) ? 0x1C00 : 0x1800;
+		WORD tileDataAddr = (LCDC & 0x10) ? 0x0 : 0x800;
 
-		WORD tileMapX = (SCX >> 3) & 0x1F;			//converting absolute coorditates to tile coordinates i.e. integer division by 8
+		WORD tileMapX = SCX >> 3;					//converting absolute coorditates to tile coordinates i.e. integer division by 8
 		WORD tileMapY = ((SCY + LY) >> 3) & 0x1F;	//then clamping to 0-31 range i.e. wrapping background
 		BYTE tileMapTileX = SCX & 0x7;				//
 		BYTE tileMapTileY = (SCY + LY) & 0x7;		//
@@ -303,20 +540,46 @@ void Cookieboy::GPU::RenderScanline()
 		int tileIdx;
 		for (WORD x = 0; x < 160; x++)
 		{
+			WORD tileAddr = tileMapAddr + tileMapX + tileMapY * 32;
 			if (LCDC & 0x10)
 			{
-				tileIdx = VRAM[tileMap + tileMapX + tileMapY * 32];
+				tileIdx = VRAM[tileAddr];
 			}
 			else
 			{
-				tileIdx = (signed char)VRAM[tileMap + tileMapX + tileMapY * 32] + 128;
-				
+				tileIdx = (signed char)VRAM[tileAddr] + 128;
 			}
-			BYTE palIdx = GET_TILE_PIXEL(tileData + tileIdx * 16, tileMapTileX, tileMapTileY);
 
-			Backbuffer[LY][x] = (BGP >> (palIdx * 2)) & 0x3;
-			Framebuffer[LY][x] = GB2RGBPalette[Backbuffer[LY][x]];
+			if (CGB)
+			{
+				BYTE tileAttributes = VRAM[VRAMBankSize + tileAddr];
 
+				BYTE flippedTileX = tileMapTileX;
+				BYTE flippedTileY = tileMapTileY;
+				if (tileAttributes & 0x20)//Horizontal flip
+				{
+					flippedTileX = 7 - flippedTileX;
+				}
+				if (tileAttributes & 0x40)//Vertical flip
+				{
+					flippedTileY = 7 - flippedTileY;
+				}
+
+				BYTE colorIdx = GET_TILE_PIXEL(VRAMBankSize * ((tileAttributes >> 3) & 0x1) + tileDataAddr + tileIdx * 16, flippedTileX, flippedTileY);
+				WORD color;
+				memcpy(&color, BGPD + (tileAttributes & 0x7) * 8 + colorIdx * 2, 2);
+
+				Backbuffer[LY][x] = (tileAttributes & 0x80) | colorIdx;//Storing pallet index with BG-to-OAM priority - sprites will need both
+				Framebuffer[LY][x] = GBC2RGBPalette[color & 0x7FFF];
+			}
+			else
+			{
+				BYTE palIdx = GET_TILE_PIXEL(tileDataAddr + tileIdx * 16, tileMapTileX, tileMapTileY);
+
+				Backbuffer[LY][x] = (BGP >> (palIdx * 2)) & 0x3;
+				Framebuffer[LY][x] = GB2RGBPalette[Backbuffer[LY][x]];
+			}
+			 
 			tileMapX = (tileMapX + ((tileMapTileX + 1) >> 3)) & 0x1F;
 			tileMapTileX = (tileMapTileX + 1) & 0x7;
 		}
@@ -333,8 +596,8 @@ void Cookieboy::GPU::RenderScanline()
 	{
 		if (WX <= 166 && WY <= 143 && WindowLine <= 143 && LY >= WY)//Checking window visibility on the whole screen and in the scanline
 		{
-			WORD tileMap = (LCDC & 0x40) ? 0x1C00 : 0x1800;
-			WORD tileData = (LCDC & 0x10) ? 0x0 : 0x800;
+			WORD tileMapAddr = (LCDC & 0x40) ? 0x1C00 : 0x1800;
+			WORD tileDataAddr = (LCDC & 0x10) ? 0x0 : 0x800;
 
 			int windowX = (signed)WX - 7;
 			WORD tileMapX = 0;
@@ -354,19 +617,46 @@ void Cookieboy::GPU::RenderScanline()
 			int tileIdx;
 			for (int x = windowX; x < 160; x++)
 			{
+				WORD tileIdxAddr = tileMapAddr + tileMapX + tileMapY * 32;
 				if (LCDC & 0x10)
 				{
-					tileIdx = VRAM[tileMap + tileMapX + tileMapY * 32];
+					tileIdx = VRAM[tileIdxAddr];
 				}
 				else
 				{
-					tileIdx = (signed char)VRAM[tileMap + tileMapX + tileMapY * 32] + 128;
+					tileIdx = (signed char)VRAM[tileIdxAddr] + 128;
 				}
-				BYTE palIdx = GET_TILE_PIXEL(tileData + tileIdx * 16, tileMapTileX, tileMapTileY);
+				
+				if (CGB)
+				{
+					BYTE tileAttributes = VRAM[VRAMBankSize + tileIdxAddr];
 
-				Backbuffer[LY][x] = (BGP >> (palIdx * 2)) & 0x3;
-				Framebuffer[LY][x] = GB2RGBPalette[Backbuffer[LY][x]];
+					BYTE flippedTileX = tileMapTileX;
+					BYTE flippedTileY = tileMapTileY;
+					if (tileAttributes & 0x20)//Horizontal flip
+					{
+						flippedTileX = 7 - flippedTileX;
+					}
+					if (tileAttributes & 0x40)//Vertical flip
+					{
+						flippedTileY = 7 - flippedTileY;
+					}
 
+					BYTE colorIdx = GET_TILE_PIXEL(VRAMBankSize * ((tileAttributes >> 3) & 0x1) + tileDataAddr + tileIdx * 16, flippedTileX, flippedTileY);
+					WORD color;
+					memcpy(&color, BGPD + (tileAttributes & 0x7) * 8 + colorIdx * 2, 2);
+				
+					Backbuffer[LY][x] = (tileAttributes & 0x80) | colorIdx;//Storing pallet index with BG-to-OAM priority - sprites will need both
+					Framebuffer[LY][x] = GBC2RGBPalette[color & 0x7FFF];
+				}
+				else
+				{
+					BYTE palIdx = GET_TILE_PIXEL(tileDataAddr + tileIdx * 16, tileMapTileX, tileMapTileY);
+
+					Backbuffer[LY][x] = (BGP >> (palIdx * 2)) & 0x3;
+					Framebuffer[LY][x] = GB2RGBPalette[Backbuffer[LY][x]];
+				}
+				
 				tileMapX = (tileMapX + ((tileMapTileX + 1) >> 3)) & 0x1F;
 				tileMapTileX = (tileMapTileX + 1) & 0x7;
 			}
@@ -391,7 +681,7 @@ void Cookieboy::GPU::RenderScanline()
 			tileIdxMask = 0xFF;
 		}
 
-		BYTE palettes[2] = {OBP0, OBP1};
+		BYTE dmgPalettes[2] = {OBP0, OBP1};
 
 		for (int i = SpriteQueue.size() - 1; i >= 0; i--)
 		{
@@ -403,7 +693,10 @@ void Cookieboy::GPU::RenderScanline()
 				continue;
 			}
 
-			BYTE palette = palettes[(OAM[spriteAddr + 3] >> 4) & 0x1];
+			BYTE dmgPalette = dmgPalettes[(OAM[spriteAddr + 3] >> 4) & 0x1];
+			BYTE *cgbPalette = &OBPD[(OAM[spriteAddr + 3] & 0x7) * 8];
+			WORD cgbTileMapOffset = VRAMBankOffset * ((OAM[spriteAddr + 3] >> 3) & 0x1);
+
 			int spriteX = OAM[spriteAddr + 1] - 8;
 			int spritePixelX = 0;
 			int spritePixelY = LY - (OAM[spriteAddr] - 16);
@@ -425,34 +718,82 @@ void Cookieboy::GPU::RenderScanline()
 				spritePixelY = spriteHeight - 1 - spritePixelY;
 			}
 
-			if (OAM[spriteAddr + 3] & 0x80)
+			//If sprite priority is
+			if ((OAM[spriteAddr + 3] & 0x80) && (!CGB || (LCDC & 0x1)))
 			{
 				//sprites are hidden only behind non-zero colors of the background and window
+				BYTE colorIdx;
 				for (int x = spriteX; x < spriteX + 8 && x < 160; x++, spritePixelX += dx)
 				{
-					BYTE palIdx = GET_TILE_PIXEL((OAM[spriteAddr + 2] & tileIdxMask) * 16, spritePixelX, spritePixelY);
-					if (palIdx == 0 || Backbuffer[LY][x] > 0)
+					if (CGB)
+					{
+						colorIdx = GET_TILE_PIXEL(cgbTileMapOffset + (OAM[spriteAddr + 2] & tileIdxMask) * 16, spritePixelX, spritePixelY);
+					}
+					else
+					{
+						colorIdx = GET_TILE_PIXEL((OAM[spriteAddr + 2] & tileIdxMask) * 16, spritePixelX, spritePixelY);
+					}
+
+					if (colorIdx == 0 ||				//sprite color 0 is transparent
+						(Backbuffer[LY][x] & 0x7) > 0)	//Sprite hidden behind colors 1-3
+					{
+						continue;
+					}
+					//If CGB game and priority flag of current background tile is set - background and window on top of sprites
+					//Master priority on LCDC can override this but here it's set and 
+					if (CGB && (Backbuffer[LY][x] & 0x80))
 					{
 						continue;
 					}
 
-					Backbuffer[LY][x] = (palette >> (palIdx * 2)) & 0x3;
-					Framebuffer[LY][x] = GB2RGBPalette[Backbuffer[LY][x]];
+					if (CGB)
+					{
+						WORD color;
+						memcpy(&color, cgbPalette + colorIdx * 2, 2);
+
+						Backbuffer[LY][x] = colorIdx;
+						Framebuffer[LY][x] = GBC2RGBPalette[color & 0x7FFF];
+					}
+					else
+					{
+						Backbuffer[LY][x] = (dmgPalette >> (colorIdx * 2)) & 0x3;
+						Framebuffer[LY][x] = GB2RGBPalette[Backbuffer[LY][x]];
+					}
 				}
 			}
 			else
 			{
 				//sprites are on top of the background and window
+				BYTE colorIdx;
 				for (int x = spriteX; x < spriteX + 8 && x < 160; x++, spritePixelX += dx)
 				{
-					BYTE palIdx = GET_TILE_PIXEL((OAM[spriteAddr + 2] & tileIdxMask) * 16, spritePixelX, spritePixelY);
-					if (palIdx == 0)//sprite color 0 is transparent
+					if (CGB)
+					{
+						colorIdx = GET_TILE_PIXEL(cgbTileMapOffset + (OAM[spriteAddr + 2] & tileIdxMask) * 16, spritePixelX, spritePixelY);
+					}
+					else
+					{
+						colorIdx = GET_TILE_PIXEL((OAM[spriteAddr + 2] & tileIdxMask) * 16, spritePixelX, spritePixelY);
+					}
+					
+					if (colorIdx == 0)//sprite color 0 is transparent
 					{
 						continue;
 					}
 
-					Backbuffer[LY][x] = (palette >> (palIdx * 2)) & 0x3;
-					Framebuffer[LY][x] = GB2RGBPalette[Backbuffer[LY][x]];
+					if (CGB)
+					{
+						WORD color;
+						memcpy(&color, cgbPalette + colorIdx * 2, 2);
+
+						Backbuffer[LY][x] = colorIdx;
+						Framebuffer[LY][x] = GBC2RGBPalette[color & 0x7FFF];
+					}
+					else
+					{
+						Backbuffer[LY][x] = (dmgPalette >> (colorIdx * 2)) & 0x3;
+						Framebuffer[LY][x] = GB2RGBPalette[Backbuffer[LY][x]];
+					}
 				}
 			}
 		}
@@ -460,70 +801,15 @@ void Cookieboy::GPU::RenderScanline()
 	#pragma endregion
 }
 
-void Cookieboy::GPU::WriteVRAM(WORD addr, BYTE value)
-{
-	if (GET_LCD_MODE() != GBLCDMODE_OAMRAM || !LCD_ON())
-	{
-		VRAM[addr] = value;
-	}
-}
-
-void Cookieboy::GPU::WriteOAM(BYTE addr, BYTE value)
-{
-	if (GET_LCD_MODE() == GBLCDMODE_HBLANK || GET_LCD_MODE() == GBLCDMODE_VBLANK || !LCD_ON())
-	{
-		OAM[addr] = value;
-	}
-}
-
-BYTE Cookieboy::GPU::ReadVRAM(WORD addr)
-{
-	if (GET_LCD_MODE() != GBLCDMODE_OAMRAM || !LCD_ON())
-	{
-		return VRAM[addr];
-	}
-	else
-	{
-		return 0xFF;
-	}
-}
-
-BYTE Cookieboy::GPU::ReadOAM(BYTE addr) 
-{
-	if (GET_LCD_MODE() == GBLCDMODE_HBLANK || GET_LCD_MODE() == GBLCDMODE_VBLANK || !LCD_ON())
-	{
-		return OAM[addr];
-	}
-	else
-	{
-		return 0xFF;
-	}
-}
-
-void Cookieboy::GPU::STATChanged(BYTE value, Interrupts &INT)
-{ 
-	STAT = value; 
-
-	//STAT bug
-	if (LCD_ON() && 
-		(GET_LCD_MODE() == GBLCDMODE_HBLANK || GET_LCD_MODE() == GBLCDMODE_VBLANK))
-	{
-		INT.Request(Interrupts::INTERRUPT_LCDC); 
-	}
-}
-
 void Cookieboy::GPU::CheckLYC(Interrupts &INT)
 {
 	if (LYC == LY)
 	{
-		if ((STAT & 0x4) == 0)
+		STAT |= 0x4;
+		if ((STAT & 0x40) && !LCDCInterrupted)//LYC=LY coincidence interrupt selected
 		{
-			STAT |= 0x4;
-			if ((STAT & 0x40) && !LCDCInterrupted)//LYC=LY coincidence interrupt selected
-			{
-				INT.Request(Interrupts::INTERRUPT_LCDC);
-				LCDCInterrupted = true;
-			}
+			INT.Request(Interrupts::INTERRUPT_LCDC);
+			LCDCInterrupted = true;
 		}
 	}
 	else
@@ -555,6 +841,43 @@ void Cookieboy::GPU::PrepareSpriteQueue()
 			}
 		}
 
-		std::sort(SpriteQueue.begin(), SpriteQueue.end(), std::less<DWORD>());
+		//In CGB mode sprites always ordered according to OAM ordering
+		//In DMG mode sprites ordered accroging to X coorinate and OAM ordering (for sprites with equal X coordinate)
+		if (!CGB && SpriteQueue.size())
+		{
+			std::sort(SpriteQueue.begin(), SpriteQueue.end(), std::less<DWORD>());
+		}
 	}
+}
+
+bool Cookieboy::GPU::HDMACopyBlock(WORD source, WORD dest, Memory &MMU)
+{
+	if (dest >= VRAMBankOffset + VRAMBankSize || source == 0xFFFF)
+	{
+		return true;
+	}
+
+	VRAM[dest + 0x0] = MMU.Read(source + 0x0);
+	VRAM[dest + 0x1] = MMU.Read(source + 0x1);
+	VRAM[dest + 0x2] = MMU.Read(source + 0x2);
+	VRAM[dest + 0x3] = MMU.Read(source + 0x3);
+	VRAM[dest + 0x4] = MMU.Read(source + 0x4);
+	VRAM[dest + 0x5] = MMU.Read(source + 0x5);
+	VRAM[dest + 0x6] = MMU.Read(source + 0x6);
+	VRAM[dest + 0x7] = MMU.Read(source + 0x7);
+	VRAM[dest + 0x8] = MMU.Read(source + 0x8);
+	VRAM[dest + 0x9] = MMU.Read(source + 0x9);
+	VRAM[dest + 0xA] = MMU.Read(source + 0xA);
+	VRAM[dest + 0xB] = MMU.Read(source + 0xB);
+	VRAM[dest + 0xC] = MMU.Read(source + 0xC);
+	VRAM[dest + 0xD] = MMU.Read(source + 0xD);
+	VRAM[dest + 0xE] = MMU.Read(source + 0xE);
+	VRAM[dest + 0xF] = MMU.Read(source + 0xF);
+
+	return false;
+}
+
+DWORD Cookieboy::GPU::GBCColorToARGB(WORD color)
+{
+	return 0xFF000000 | color;
 }

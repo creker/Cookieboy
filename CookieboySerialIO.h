@@ -11,7 +11,7 @@ class Interrupts;
 class SerialIO
 {
 public:
-	SerialIO() { Reset(); }
+	SerialIO(const bool &_CGB, const bool &_CGBDoubleSpeed) : CGB(_CGB), CGBDoubleSpeed(_CGBDoubleSpeed) { Reset(); }
 
 	void Step(DWORD clockDelta, Interrupts &INT) {}
 
@@ -26,6 +26,9 @@ public:
 	BYTE GetSC() { return SC | 0x7E; }
 
 private:
+	const bool &CGB;
+	const bool &CGBDoubleSpeed;
+
 	BYTE SB;//Serial transfer data (R/W)
 			//8 Bits of data to be read/written
 

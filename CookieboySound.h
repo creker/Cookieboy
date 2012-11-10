@@ -47,7 +47,7 @@ Passed tests
 class Sound
 {
 public:
-	Sound(int sampleRate = 44100, int sampleBufferLength = 1024);
+	Sound(const bool &_CGB, int sampleRate = 44100, int sampleBufferLength = 1024);
 	~Sound();
 
 	void Step(DWORD clockDelta);
@@ -120,6 +120,8 @@ public:
 	void WaitForNewFrame() { NewFrameReady = false; }
 
 private:
+
+	const bool &CGB;
 
 	//Sound units
 	SoundUnit1 *Sound1;
