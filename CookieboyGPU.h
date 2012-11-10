@@ -73,6 +73,7 @@ public:
 	void WXChanged(BYTE value) { WX = value; }
 
 	BYTE GetLCDC() { return LCDC; }
+	BYTE GetSTAT() { return STAT | 0x80; }
 	BYTE GetSTAT() { return STAT; }
 	BYTE GetSCY() { return SCY; }
 	BYTE GetSCX() { return SCX; }
