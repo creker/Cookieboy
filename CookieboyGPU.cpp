@@ -48,7 +48,7 @@ Cookieboy::GPU::GPU(RGBPalettes palette)
 void Cookieboy::GPU::Step(DWORD clockDelta, Interrupts &INT)
 {
 	ClockCounter += clockDelta;
-
+	
 	while (ClockCounter >= ClocksToNextState)
 	{
 		ClockCounter -= ClocksToNextState;
@@ -76,6 +76,9 @@ void Cookieboy::GPU::Step(DWORD clockDelta, Interrupts &INT)
 				LCDCInterrupted = true;
 			}
 
+			//LYC=LY checked in the beginning of scanline
+			CheckLYC(INT);
+			
 			ScrollXClocks = (SCX & 0x4) ? 4 : 0;
 			LCDMode = LCDMODE_LYXX_OAMRAM;
 			ClocksToNextState = 80;
@@ -105,9 +108,12 @@ void Cookieboy::GPU::Step(DWORD clockDelta, Interrupts &INT)
 
 		case LCDMODE_LYXX_HBLANK_INC:
 			LY++;
-
+			
+			//Reset LYC bit
+			STAT &= 0xFB;
+			
 			LCDCInterrupted = false;
-			CheckLYC(INT);
+
 			if (LY == 144)
 			{
 				LCDMode = LCDMODE_LY9X_VBLANK;
@@ -121,6 +127,7 @@ void Cookieboy::GPU::Step(DWORD clockDelta, Interrupts &INT)
 
 		/* Offscreen LCD modes */
 		case LCDMODE_LY9X_VBLANK:
+			//V-blank interrupt
 			if (LY == 144)
 			{
 				SET_LCD_MODE(GBLCDMODE_VBLANK);
@@ -132,6 +139,9 @@ void Cookieboy::GPU::Step(DWORD clockDelta, Interrupts &INT)
 				}
 			}
 
+			//Checking LYC=LY in the begginng of scanline
+			CheckLYC(INT);
+
 			LCDMode = LCDMODE_LY9X_VBLANK_INC;
 			ClocksToNextState = 452;
 			break;
@@ -139,26 +149,30 @@ void Cookieboy::GPU::Step(DWORD clockDelta, Interrupts &INT)
 		case LCDMODE_LY9X_VBLANK_INC:
 			LY++;
 
-			CheckLYC(INT);
+			//Reset LYC bit
+			STAT &= 0xFB;
+
 			if (LY == 153)
 			{
 				LCDMode = LCDMODE_LY00_VBLANK;
 			}
 			else
 			{
+				
 				LCDMode = LCDMODE_LY9X_VBLANK;
 			}
+
+			LCDCInterrupted = false;
+			
 			ClocksToNextState = 4;
 			break;
 
 		case LCDMODE_LY00_VBLANK:
+			//Checking LYC=LY in the begginng of scanline
+			//Here LY = 153
+			CheckLYC(INT);
+			
 			LY = 0;
-			WindowLine = 0;
-			if (DelayedWY > -1)
-			{
-				WY = DelayedWY;
-				DelayedWY = -1;
-			}
 
 			LCDMode = LCDMODE_LY00_HBLANK;
 			ClocksToNextState = 452;
@@ -167,10 +181,19 @@ void Cookieboy::GPU::Step(DWORD clockDelta, Interrupts &INT)
 		case LCDMODE_LY00_HBLANK:
 			SET_LCD_MODE(GBLCDMODE_HBLANK);
 
-			LCDMode = LCDMODE_LYXX_OAM;
-			ClocksToNextState = 4;
+			LCDCInterrupted = false;
+
+			if (DelayedWY > -1)
+			{
+				WY = DelayedWY;
+				DelayedWY = -1;
+			}
 
 			NewFrameReady = true;
+			WindowLine = 0;
+
+			LCDMode = LCDMODE_LYXX_OAM;
+			ClocksToNextState = 4;
 			break;
 		}
 	}
