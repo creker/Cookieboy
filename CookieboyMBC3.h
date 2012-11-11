@@ -82,8 +82,8 @@ public:
 		RAMOffset = 0;
 		RAMRTCEnabled = false;
 		LastLatchWrite = 0xFF;
-		BaseTime = std::time(NULL);
-		HaltTime = std::time(NULL);
+		BaseTime = 0;
+		HaltTime = 0;
 	}
 
 	virtual void Write(WORD addr, BYTE value)
@@ -300,7 +300,7 @@ public:
 private:
 	void LatchRTCData()
 	{
-		time_t passedTime = (RTCRegisters[RTC_DH] & 0x40) ? HaltTime : std::time(NULL) - BaseTime;
+		time_t passedTime = ((RTCRegisters[RTC_DH] & 0x40) ? HaltTime : std::time(NULL)) - BaseTime;
 
 		if (passedTime > 0x1FF * 86400)
 		{
