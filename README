@@ -4,13 +4,14 @@ sam901@yandex.ru
 Cookieboy is a Gameboy emulator written in C++. 
 
 Main features:
+-Gameboy and Gameboy Color emulation
 -Full CPU emulation with accurate timings. Passes all blargg's CPU tests (opcodes and timings).
 -Accurate memory timings emulation. Passes blargg's RAM timings tests.
 -Full emulation of several ROM MBC's: MBC1, MBC2, MBC3 with RTC, MBC5, MMM01. 
 -Supports battery powered external RAM.
 -Full LCD emulation. Background, window, sprites.
 -Pretty accurate LCD controller timings emulation with OAM and VRAM locking. Passes blargg's lcd-sync.gb test.
--Accurate sound emulation. Passes all blargg's sound tests - DMG sound tests and CGB sound tests in DMG mode.
+-Accurate sound emulation. Passes all blargg's sound tests - DMG sound tests and CGB sound tests in both DMG (with proper error codes) and CGB modes.
 
 Key mapping:
 Up:     Up
@@ -21,5 +22,14 @@ A:      Z
 B:      X
 Start:  S
 Select: A
+
+Debugging helpers:
+F1:		Toggle backgroud
+F2:		Toggle window
+F3:		Toggle sprites
+F5:		Toggle sound 1
+F6:		Toggle sound 2
+F7:		Toggle sound 3
+F8:		Toggle sound 4
 
 By default emulator runs at normal Gameboy speed. Press "Space" to run at maximum speed (depends on your PC).
