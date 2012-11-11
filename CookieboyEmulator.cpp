@@ -1,5 +1,6 @@
 #include "CookieboyEmulator.h"
 #include "CookieboyCPU.h"
+#include "CookieboySpeedSwitcher.h"
 #include "CookieboyInterrupts.h"
 #include "CookieboyMemory.h"
 #include "CookieboyDividerTimer.h"
@@ -19,14 +20,16 @@ CGBDoubleSpeed(false)
 	Input = new Joypad();
 	Serial = new SerialIO(CGB, CGBDoubleSpeed);
 	SPU = new Sound(CGB, soundSampleRate, soundSampleBufferLength);
+	CGBSpeedSwitcher = new SpeedSwitcher(CGB, CGBDoubleSpeed);
 
-	MMU = new Memory(CGB, CGBDoubleSpeed, *Gpu, *DIV, *TIMA, *Input, *SPU, *Serial, *INT);
-	Cpu = new CPU(CGB, CGBDoubleSpeed, *MMU, *Gpu, *DIV, *TIMA, *Input, *SPU, *Serial, *INT);
+	MMU = new Memory(CGB, CGBDoubleSpeed, *CGBSpeedSwitcher, *Gpu, *DIV, *TIMA, *Input, *SPU, *Serial, *INT);
+	Cpu = new CPU(CGB, CGBDoubleSpeed, *CGBSpeedSwitcher, *MMU, *Gpu, *DIV, *TIMA, *Input, *SPU, *Serial, *INT);
 }
 
 Cookieboy::Emulator::~Emulator()
 {
 	delete Cpu;
+	delete CGBSpeedSwitcher;
 	delete Gpu;
 	delete DIV;
 	delete TIMA;
@@ -60,6 +63,7 @@ void Cookieboy::Emulator::UpdateJoypad(Joypad::ButtonsState &state)
 void Cookieboy::Emulator::Reset()
 {
 	Cpu->Reset();
+	CGBSpeedSwitcher->Reset();
 	Gpu->Reset();
 	DIV->Reset();
 	TIMA->Reset();
@@ -79,6 +83,7 @@ void Cookieboy::Emulator::UseBIOS(bool BIOS)
 	else
 	{
 		Cpu->EmulateBIOS();
+		CGBSpeedSwitcher->EmulateBIOS();
 		Gpu->EmulateBIOS();
 		DIV->EmulateBIOS();
 		TIMA->EmulateBIOS();

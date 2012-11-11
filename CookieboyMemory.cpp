@@ -1,6 +1,7 @@
 #include "CookieboyMemory.h"
 #include <stdio.h>
 
+#include "CookieboySpeedSwitcher.h"
 #include "CookieboyMBC.h"
 #include "CookieboyDividerTimer.h"
 #include "CookieboyTIMATimer.h"
@@ -39,6 +40,7 @@ BYTE Cookieboy::Memory::NintendoGraphic[48] = { 0xCE, 0xED, 0x66, 0x66, 0xCC, 0x
 
 Cookieboy::Memory::Memory(bool &_CGB,
 						  bool &_CGBDoubleSpeed,
+						  SpeedSwitcher &speedSwitcher,
 						  Cookieboy::GPU &GPU, 
 						  Cookieboy::DividerTimer &DIV,
 						  Cookieboy::TIMATimer &TIMA,
@@ -48,6 +50,7 @@ Cookieboy::Memory::Memory(bool &_CGB,
 						  Cookieboy::Interrupts &INT):
 CGB(_CGB),
 CGBDoubleSpeed(_CGBDoubleSpeed),
+CGBSpeedSwitcher(speedSwitcher),
 GPU(GPU),
 DIV(DIV),
 TIMA(TIMA),
@@ -553,9 +556,7 @@ void Cookieboy::Memory::Write(WORD addr, BYTE value)
 				break;
 
 			case IOPORT_KEY1:
-				{
-					int a = 0;
-				}
+				CGBSpeedSwitcher.KEY1Changed(value);
 				break;
 				
 			case IOPORT_VBK:
@@ -861,7 +862,7 @@ BYTE Cookieboy::Memory::Read(WORD addr)
 				return GPU.GetWX();
 
 			case IOPORT_KEY1:
-				return 0xFF;
+				return CGBSpeedSwitcher.GetKEY1();
 
 			case IOPORT_VBK:
 				return GPU.GetVBK();

@@ -11,6 +11,7 @@
 #include "CookieboySound.h"
 #include "CookieboyJoypad.h"
 #include "CookieboySerialIO.h"
+#include "CookieboySpeedSwitcher.h"
 
 /*
 Passed tests
@@ -37,13 +38,18 @@ Passed tests
 		03-modify_timing
 */
 
-#define SYNC_WITH_CPU(clockDelta)	\
-	GPU.Step(clockDelta, MMU);		\
-	DIV.Step(clockDelta);			\
-	TIMA.Step(clockDelta, INT);		\
-	Serial.Step(clockDelta, INT);	\
-	Joypad.Step(INT);				\
-	Sound.Step(clockDelta);
+#define SYNC_WITH_CPU(clockDelta)			\
+	{DWORD adjustedClockDelta = clockDelta;	\
+	if (CGBDoubleSpeed)						\
+	{										\
+		adjustedClockDelta >>= 1;			\
+	}										\
+	GPU.Step(adjustedClockDelta, MMU);		\
+	DIV.Step(adjustedClockDelta);			\
+	TIMA.Step(adjustedClockDelta, INT);		\
+	Serial.Step(adjustedClockDelta, INT);	\
+	Joypad.Step(INT);						\
+	Sound.Step(adjustedClockDelta);}
 
 //Using this to replace conditionals with bitwise operations. Should be extremly careful using it - assumes operands and calculations are 32-bit
 #define EQUALS_ZERO(value) ((~((value) | (~(value) + 1)) >> 31) & 0x1)
@@ -305,6 +311,7 @@ Passed tests
 
 Cookieboy::CPU::CPU(const bool &_CGB,
 					bool &_CGBDoubleSpeed,
+					SpeedSwitcher &speedSwitcher,
 					Cookieboy::Memory &MMU,
 					Cookieboy::GPU &GPU,
 					Cookieboy::DividerTimer &DIV,
@@ -315,6 +322,7 @@ Cookieboy::CPU::CPU(const bool &_CGB,
 					Cookieboy::Interrupts &INT):
 CGB(_CGB),
 CGBDoubleSpeed(_CGBDoubleSpeed),
+CGBSpeedSwitcher(speedSwitcher),
 MMU(MMU),
 GPU(GPU),
 DIV(DIV),
@@ -1686,8 +1694,13 @@ void Cookieboy::CPU::Step()
 		#pragma endregion
 		#pragma region STOP
 		case 0x10:
-			immValueB = MemoryRead(PC);
-			//Ignoring STOP for now
+			//CPU speed switch
+			if (CGB && (CGBSpeedSwitcher.GetKEY1() & 0x1))
+			{
+				//Clearing prepare speed switch bit
+				CGBSpeedSwitcher.KEY1Changed(0);
+				CGBDoubleSpeed = !CGBDoubleSpeed;
+			}
 			break;
 		#pragma endregion
 		#pragma region DI

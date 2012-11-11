@@ -9,6 +9,7 @@ namespace Cookieboy
 {
 
 class CPU;
+class SpeedSwitcher;
 class Interrupts;
 class Memory;
 class DividerTimer;
@@ -55,6 +56,7 @@ private:
 	bool CGBDoubleSpeed;
 
 	CPU *Cpu;
+	SpeedSwitcher *CGBSpeedSwitcher;
 	GPU *Gpu;
 	Interrupts *INT;
 	Memory *MMU;

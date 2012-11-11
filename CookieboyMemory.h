@@ -15,6 +15,7 @@ class Sound;
 class SerialIO;
 class Interrupts;
 class MBC;
+class SpeedSwitcher;
 
 const int WRAMBankSize = 0x1000;
 
@@ -91,7 +92,7 @@ public:
 		EMULMODE_AUTO = 2
 	};
 
-	Memory(bool &_CGB, bool &_CGBDoubleSpeed, GPU &GPU, DividerTimer &DIV, TIMATimer &TIMA, Joypad &joypad, Sound &sound, SerialIO &serial, Interrupts &INT);
+	Memory(bool &_CGB, bool &_CGBDoubleSpeed, SpeedSwitcher &speedSwitcher, GPU &GPU, DividerTimer &DIV, TIMATimer &TIMA, Joypad &joypad, Sound &sound, SerialIO &serial, Interrupts &INT);
 	~Memory();
 
 	const ROMInfo* LoadROM(const char* ROMPath, EmulationModes mode = EMULMODE_AUTO);
@@ -140,6 +141,7 @@ private:
 	static BYTE NintendoGraphic[48];
 
 	//Hardware units
+	SpeedSwitcher &CGBSpeedSwitcher;
 	GPU &GPU;
 	Joypad &Joypad;
 	Sound &Sound;

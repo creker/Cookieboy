@@ -22,6 +22,7 @@ class Joypad;
 class Sound;
 class SerialIO;
 class Interrupts;
+class SpeedSwitcher;
 
 /*
 The GameBoy uses a computer chip similar to an Intel 8080. It contains all of the instructions of an 8080
@@ -45,7 +46,7 @@ public:
 		WORD word;
 	};
 
-	CPU(const bool &CGB, bool &_CGBDoubleSpeed, Memory &MMU, GPU &GPU, DividerTimer &DIV, TIMATimer &TIMA, Joypad &joypad, Sound &sound, SerialIO &serial, Interrupts &INT);
+	CPU(const bool &CGB, bool &_CGBDoubleSpeed, SpeedSwitcher &speedSwitcher, Memory &MMU, GPU &GPU, DividerTimer &DIV, TIMATimer &TIMA, Joypad &joypad, Sound &sound, SerialIO &serial, Interrupts &INT);
 
 	void Step();
 
@@ -88,6 +89,7 @@ private:
 	BYTE DIDelay;
 	BYTE EIDelay;
 
+	SpeedSwitcher &CGBSpeedSwitcher;
 	Memory &MMU;
 	GPU &GPU;
 	DividerTimer &DIV;
