@@ -236,8 +236,15 @@ void Cookieboy::GPU::Reset()
 		memset(Backbuffer[i], 0, sizeof(Backbuffer[0][0]) * 160);
 	}
 
-	// Initially all background colors are initialized as white
+	//Initially all background colors are initialized as white
 	memset(BGPD, 0xFF, 64);
+
+	// Initially all sprite colors are random
+	srand(clock());
+	for (int i = 0; i < 64; i++)
+	{
+		OBPD[i] = rand() % 0x100;
+	}
 
 	LCDC = 0x0;
 	STAT = 0x0;
