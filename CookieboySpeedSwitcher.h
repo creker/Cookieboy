@@ -7,6 +7,10 @@ namespace Cookieboy
 {
 
 /*
+FF4D - KEY1 - CGB Mode Only - Prepare Speed Switch
+  Bit 7: Current Speed     (0=Normal, 1=Double) (Read Only)
+  Bit 0: Prepare Speed Switch (0=No, 1=Prepare) (Read/Write)
+
 This register is used to prepare the gameboy to switch between CGB Double Speed Mode and Normal Speed Mode. 
 The actual speed switch is performed by executing a STOP command after Bit 0 has been set. After that Bit 0 will be cleared automatically, 
 and the gameboy will operate at the 'other' speed.

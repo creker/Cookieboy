@@ -21,10 +21,17 @@ public:
 	*/
 	enum GameboyLCDModes
 	{
-		GBLCDMODE_HBLANK = 0,	//H-Blank period. CPU can access the VRAM and OAM
-		GBLCDMODE_VBLANK = 1,	//V-Blank period. CPU can access the VRAM and OAM
 		GBLCDMODE_OAM = 2,		//OAM is being used ($FE00-$FE9F). CPU cannot access the OAM during this period
-		GBLCDMODE_OAMRAM = 3	//Both the OAM and VRAM are being used. The CPU cannot access either during this period
+
+		GBLCDMODE_OAMRAM = 3,	//Both the OAM and VRAM are being used. The CPU cannot access either during this period
+								//This is where all rendering is done. Lasts for (172 + (SCX % 8) + Sprites) cycles
+								//Sprites causing this mode to take longer
+
+		GBLCDMODE_HBLANK = 0,	//H-Blank period. CPU can access the VRAM and OAM
+								//Lasts for (204 - (SCX % 8) - Sprites) cycles
+								//Here LCD controller compencates mode 3 delays so a scanline would take exactly 456 cycles
+
+		GBLCDMODE_VBLANK = 1	//V-Blank period. CPU can access the VRAM and OAM
 	};
 
 	enum InternalLCDModes
