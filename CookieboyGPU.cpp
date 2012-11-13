@@ -1,5 +1,6 @@
 #include "CookieboyGPU.h"
 #include <algorithm>
+#include <time.h>
 
 #include "CookieboyInterrupts.h"
 #include "CookieboyMemory.h"
@@ -885,9 +886,4 @@ bool Cookieboy::GPU::HDMACopyBlock(WORD source, WORD dest, Memory &MMU)
 	VRAM[dest + 0xF] = MMU.Read(source + 0xF);
 
 	return false;
-}
-
-DWORD Cookieboy::GPU::GBCColorToARGB(WORD color)
-{
-	return 0xFF000000 | color;
 }
