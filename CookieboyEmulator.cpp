@@ -14,7 +14,7 @@ CGB(false),
 CGBDoubleSpeed(false)
 {
 	INT = new Interrupts();
-	Gpu = new GPU(CGB, *INT, palette);
+	Gpu = new GPU(CGB, CGBDoubleSpeed, *INT, palette);
 	TIMA = new TIMATimer(CGB, CGBDoubleSpeed);
 	DIV = new DividerTimer(CGB, CGBDoubleSpeed);
 	Input = new Joypad();

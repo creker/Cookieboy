@@ -3,7 +3,6 @@
 
 #include "CookieboyDefs.h"
 #include <vector>
-#include <stdio.h>
 
 namespace Cookieboy
 {
@@ -52,7 +51,7 @@ public:
 		RGBPALETTE_REAL = 1
 	};
 
-	GPU(const bool &_CGB, Interrupts& INT, DMGPalettes palette = RGBPALETTE_REAL);
+	GPU(const bool &_CGB, const bool &_CGBDoubleSpeed, Interrupts& INT, DMGPalettes palette = RGBPALETTE_REAL);
 
 	void Step(DWORD clockDelta, Memory& MMU);
 
@@ -68,6 +67,7 @@ public:
 	BYTE ReadVRAM(WORD addr);
 	BYTE ReadOAM(BYTE addr);
 
+	void DMAStep(DWORD clockDelta, Memory& MMU);
 	void DMAChanged(BYTE value, Memory& MMU);
 	void LCDCChanged(BYTE value);
 	void STATChanged(BYTE value);
@@ -128,6 +128,7 @@ private:
 	DWORD GBCColorToARGB(WORD color);
 
 	const bool &CGB;
+	const bool &CGBDoubleSpeed;
 
 	Interrupts& INT;
 
@@ -214,11 +215,6 @@ private:
 				//0 <= WX <= 166
 				//WX must be greater than or equal to 0 and must be less than or equal to 166 for window to be visible
 
-	bool hdmaActive;
-	WORD HDMASource;
-	WORD HDMADestination;
-	BYTE HDMAControl;//New DMA Length/Mode/Start
-
 	BYTE VBK;	//Current Video Memory (VRAM) Bank
 				//Bit 0 - VRAM Bank (0-1)
 
@@ -258,6 +254,18 @@ private:
 
 	BYTE WindowLine;
 	int DelayedWY;
+
+	//OAM DMA
+	bool OAMDMAStarted;
+	WORD OAMDMAProgress;
+	WORD OAMDMASource;
+	DWORD OAMDMAClockCounter;
+
+	//VRAM DMA
+	bool HDMAActive;
+	WORD HDMASource;
+	WORD HDMADestination;
+	BYTE HDMAControl;//New DMA Length/Mode/Start
 
 	//Debug
 	bool BackgroundGlobalToggle;

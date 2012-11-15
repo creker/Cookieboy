@@ -1,6 +1,7 @@
 #include "CookieboyGPU.h"
 #include <algorithm>
 #include <time.h>
+#include <stdio.h>
 
 #include "CookieboyInterrupts.h"
 #include "CookieboyMemory.h"
@@ -10,12 +11,13 @@
 #define SET_LCD_MODE(value) {STAT &= 0xFC; STAT |= (value);}
 #define GET_TILE_PIXEL(VRAMAddr, x, y) ((((VRAM[(VRAMAddr) + (y) * 2 + 1] >> (7 - (x))) & 0x1) << 1) | ((VRAM[(VRAMAddr) + (y) * 2] >> (7 - (x))) & 0x1))
 
-Cookieboy::GPU::GPU(const bool &_CGB, Interrupts& INT, DMGPalettes palette) :
+Cookieboy::GPU::GPU(const bool &_CGB, const bool &_CGBDoubleSpeed, Interrupts& INT, DMGPalettes palette) :
 BackgroundGlobalToggle(true),
 WindowsGlobalToggle(true),
 SpritesGlobalToggle(true),
 INT(INT),
-CGB(_CGB)
+CGB(_CGB),
+CGBDoubleSpeed(_CGBDoubleSpeed)
 {
 	Reset();
 
@@ -63,6 +65,11 @@ void Cookieboy::GPU::Step(DWORD clockDelta, Memory& MMU)
 {
 	ClockCounter += clockDelta;
 	
+	if (OAMDMAStarted)
+	{
+		DMAStep(clockDelta, MMU);
+	}
+
 	while (ClockCounter >= ClocksToNextState)
 	{
 		ClockCounter -= ClocksToNextState;
@@ -117,7 +124,7 @@ void Cookieboy::GPU::Step(DWORD clockDelta, Memory& MMU)
 			}
 
 			//HDMA block copy
-			if (CGB && hdmaActive)
+			if (CGB && HDMAActive)
 			{
 				HDMACopyBlock(HDMASource, VRAMBankOffset + HDMADestination, MMU);
 				HDMAControl--;
@@ -127,7 +134,7 @@ void Cookieboy::GPU::Step(DWORD clockDelta, Memory& MMU)
 				if ((HDMAControl & 0x7F) == 0x7F)
 				{
 					HDMAControl = 0xFF;
-					hdmaActive = false;
+					HDMAActive = false;
 				}
 			}
 
@@ -268,13 +275,17 @@ void Cookieboy::GPU::Reset()
 	DelayedWY = -1;
 	WindowLine = 0;
 	VRAMBankOffset = 0;
-	hdmaActive = false;
+	HDMAActive = false;
 	HDMASource = 0;
 	HDMADestination = 0;
 	HDMAControl = 0;
 	VBK = 0;
 	BGPI = 0;
 	OBPI = 0;
+	OAMDMAStarted = false;
+	OAMDMAClockCounter = 0;
+	OAMDMASource = 0;
+	OAMDMAProgress = 0;
 }
 
 void Cookieboy::GPU::EmulateBIOS()
@@ -330,13 +341,46 @@ BYTE Cookieboy::GPU::ReadOAM(BYTE addr)
 	}
 }
 
+void Cookieboy::GPU::DMAStep(DWORD clockDelta, Memory& MMU)
+{
+	OAMDMAClockCounter += clockDelta;
+
+	//In double speed mode OAM DMA runs faster
+	int bytesToCopy = 0;
+	if (CGB && CGBDoubleSpeed)
+	{
+		bytesToCopy = OAMDMAClockCounter / 2;
+		OAMDMAClockCounter %= 2;
+	}
+	else
+	{
+		bytesToCopy = OAMDMAClockCounter / 5;
+		OAMDMAClockCounter %= 5;
+	}
+
+	if (OAMDMAProgress + bytesToCopy >= 0xA0)
+	{
+		OAMDMAStarted = false;
+		bytesToCopy = 0xA0 - OAMDMAProgress;
+	}
+
+	for (int i = 0; i < bytesToCopy; i++, OAMDMAProgress++)
+	{
+		OAM[OAMDMAProgress] = MMU.Read(OAMDMASource | OAMDMAProgress);
+	}
+}
+
 void Cookieboy::GPU::DMAChanged(BYTE value, Memory& MMU)
 {
+	OAMDMAStarted = true;
+	OAMDMASource = value << 8;
+	OAMDMAClockCounter = 0;
+	OAMDMAProgress = 0;
 	//Transferring data to OAM
-	for (int i = 0; i < 0xA0; i++)
+	/*for (int i = 0; i < 0xA0; i++)
 	{
 		OAM[i] = MMU.Read((value << 8) | i);
-	}
+	}*/
 }
 
 void Cookieboy::GPU::LCDCChanged(BYTE value)
@@ -464,11 +508,11 @@ void Cookieboy::GPU::HDMA5Changed(BYTE value, Memory& MMU)
 
 	HDMAControl = value & 0x7F;
 
-	if (hdmaActive)
+	if (HDMAActive)
 	{
 		if (!(value & 0x80))
 		{
-			hdmaActive = false;
+			HDMAActive = false;
 			HDMAControl |= 0x80;
 		}
 	}
@@ -476,11 +520,11 @@ void Cookieboy::GPU::HDMA5Changed(BYTE value, Memory& MMU)
 	{
 		if (value & 0x80)//H-Blank DMA
 		{
-			hdmaActive = true;
+			HDMAActive = true;
 		}
 		else//General purpose DMA
 		{
-			hdmaActive = false;
+			HDMAActive = false;
 
 			WORD sourceAddr = HDMASource;
 			WORD destAddr = VRAMBankOffset + HDMADestination;
