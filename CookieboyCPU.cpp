@@ -1675,7 +1675,15 @@ void Cookieboy::CPU::Step()
 			{
 				if (IME == 0 && (INT.GetIE() & INT.GetIF() & 0x1F))
 				{
-					HaltBug = true;
+					if (CGB)
+					{
+						//HALT bug was fixed in CGB - by default NOP instruction executed after HALT and execution continued
+						SYNC_WITH_CPU(4);
+					}
+					else
+					{
+						HaltBug = true;
+					}
 				}
 				else
 				{
